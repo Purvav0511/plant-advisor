@@ -2,8 +2,9 @@
 
 - Local Supabase (Docker) is only for integration tests (PLAN 0.4). It starts just the
   services the tests need.
-- `migrate` without `--local` applies migrations to the shared hosted dev project. It
-  refuses if this branch is behind GitHub, so you never migrate from a stale checkout.
+- `migrate` without `--local` applies migrations to the shared hosted dev project. It only
+  runs from a clean `dev` that matches GitHub exactly, so the shared database only ever
+  gets reviewed, merged migrations. When it can't tell, it refuses.
 - `reset` only ever targets the local database. Nothing here can reset a remote one.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 from scripts._common import find_tool, run_capture, run_passthrough
@@ -33,6 +35,19 @@ EXCLUDED_SERVICES = [
 
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
+# The only branch that may migrate the shared dev database (decision 0019).
+MIGRATE_BRANCH = "dev"
+
+
+class RepoState(NamedTuple):
+    """What `migrate` needs to know about the local checkout."""
+
+    branch: str
+    dirty: bool  # uncommitted changes to tracked or new files
+    fetched: bool  # whether `git fetch` reached GitHub just now
+    ahead: int  # local commits not on GitHub
+    behind: int  # GitHub commits not in the local branch
+
 
 def is_local_url(url: str) -> bool:
     """Whether a Postgres URL points at this machine."""
@@ -46,14 +61,50 @@ def supabase(args: list[str]) -> int:
     return run_passthrough(["pnpm", "exec", "supabase", *args])
 
 
-def branch_is_behind() -> tuple[bool, str]:
-    """Whether the current branch is behind its upstream on GitHub (after fetching)."""
-    run_capture(["git", "fetch", "--quiet"], timeout=60)
-    proc = run_capture(["git", "rev-list", "--count", "HEAD..@{upstream}"])
-    if proc is None or proc.returncode != 0:
-        return False, "no upstream branch to compare with"
-    behind = int(proc.stdout.strip() or 0)
-    return behind > 0, f"{behind} commit(s) behind GitHub"
+def remote_migrate_problems(state: RepoState) -> list[str]:
+    """Reasons not to migrate the shared database from this checkout; empty means go ahead."""
+    problems: list[str] = []
+    if state.branch != MIGRATE_BRANCH:
+        problems.append(
+            f"you're on `{state.branch}`; migrate the shared database only from `{MIGRATE_BRANCH}`"
+            f" after the PR is merged (`git switch {MIGRATE_BRANCH} && git pull`)"
+        )
+    if state.dirty:
+        problems.append("there are uncommitted changes; commit or stash them first")
+    if not state.fetched:
+        problems.append("couldn't reach GitHub to check you're up to date; try again online")
+    elif state.branch == MIGRATE_BRANCH:
+        # Ahead/behind compares HEAD with GitHub's `dev`, so it only means something on `dev`.
+        if state.behind:
+            problems.append(
+                f"`{MIGRATE_BRANCH}` is {state.behind} commit(s) behind GitHub; run `git pull`"
+            )
+        if state.ahead:
+            problems.append(
+                f"`{MIGRATE_BRANCH}` has {state.ahead} commit(s) that aren't on GitHub; "
+                "they must arrive through a merged PR"
+            )
+    return problems
+
+
+def repo_state() -> RepoState:
+    """Read the checkout's state, fetching `dev` from GitHub first."""
+    branch_proc = run_capture(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    branch = branch_proc.stdout.strip() if branch_proc and branch_proc.returncode == 0 else ""
+    status = run_capture(["git", "status", "--porcelain"])
+    dirty = status is None or status.returncode != 0 or bool(status.stdout.strip())
+    fetch = run_capture(["git", "fetch", "--quiet", "origin", MIGRATE_BRANCH], timeout=60)
+    fetched = fetch is not None and fetch.returncode == 0
+    ahead = behind = 0
+    if fetched:
+        counts = run_capture(
+            ["git", "rev-list", "--left-right", "--count", f"HEAD...origin/{MIGRATE_BRANCH}"]
+        )
+        if counts is None or counts.returncode != 0:
+            fetched = False
+        else:
+            ahead, behind = (int(n) for n in counts.stdout.split())
+    return RepoState(branch=branch, dirty=dirty, fetched=fetched, ahead=ahead, behind=behind)
 
 
 def up() -> int:
@@ -75,9 +126,11 @@ def migrate(argv: list[str]) -> int:
     if not url:
         print("error: DATABASE_URL is empty. Fill it in .env (DEV_SETUP §5).")
         return 1
-    behind, detail = branch_is_behind()
-    if behind:
-        print(f"refusing: this branch is {detail}. Run `git pull` first.")
+    problems = remote_migrate_problems(repo_state())
+    if problems:
+        print("refusing to migrate the shared dev database:")
+        for problem in problems:
+            print(f"  - {problem}")
         return 1
     print("Applying migrations to the shared dev database (DATABASE_URL)...")
     return supabase(["migration", "up", "--db-url", url])
@@ -97,8 +150,8 @@ def test_int(argv: list[str]) -> int:
 
 def main(argv: list[str]) -> int:
     commands = {
-        "up": lambda: up(),
-        "down": lambda: down(),
+        "up": up,
+        "down": down,
         "migrate": lambda: migrate(argv[1:]),
         "test-int": lambda: test_int(argv[1:]),
     }
