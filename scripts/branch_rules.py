@@ -51,6 +51,20 @@ def merge_plan(base: str, head: str) -> MergePlan | None:
     return None
 
 
+# The PR template's reading checkbox. `poe merge` refuses until the owner ticks it, so no
+# file merges unread (CLAUDE.md "Reading before merging").
+READ_CONFIRMATION = "I read every changed file"
+
+
+def owner_has_read(pr_body: str | None) -> bool:
+    """Whether the PR body has the reading checkbox ticked (`- [x] I read every changed file`)."""
+    for line in (pr_body or "").splitlines():
+        text = line.strip().lower()
+        if text.startswith(("- [x]", "* [x]")) and READ_CONFIRMATION.lower() in text:
+            return True
+    return False
+
+
 def checks_passing(conclusions: Iterable[str | None]) -> tuple[bool, str]:
     """Whether every check passed. An empty list doesn't count as passing."""
     values = [(c or "PENDING").upper() for c in conclusions]

@@ -10,7 +10,7 @@ import json
 import sys
 
 from scripts._common import run_capture, run_passthrough
-from scripts.branch_rules import checks_passing, merge_plan
+from scripts.branch_rules import READ_CONFIRMATION, checks_passing, merge_plan, owner_has_read
 
 
 def rollup_conclusions(rollup: list[dict[str, str]]) -> list[str | None]:
@@ -31,7 +31,7 @@ def main(argv: list[str]) -> int:
         print("usage: uv run poe merge <pr-number>")
         return 2
     number = argv[0]
-    fields = "baseRefName,headRefName,state,isDraft,mergeable,statusCheckRollup,title"
+    fields = "baseRefName,headRefName,state,isDraft,mergeable,statusCheckRollup,title,body"
     proc = run_capture(["gh", "pr", "view", number, "--json", fields])
     if proc is None or proc.returncode != 0:
         reason = proc.stderr.strip() if proc else "gh not found"
@@ -51,6 +51,12 @@ def main(argv: list[str]) -> int:
     ok, detail = checks_passing(rollup_conclusions(pr["statusCheckRollup"]))
     if not ok:
         print(f"refusing: {detail}. Wait for CI or fix it first.")
+        return 1
+    if not owner_has_read(pr.get("body")):
+        print(
+            f"refusing: tick `- [x] {READ_CONFIRMATION}` in the PR description once you've read "
+            "the code (ask `/walkthrough " + number + "` for a guided read)"
+        )
         return 1
     if pr["mergeable"] == "CONFLICTING":
         print("refusing: the PR has merge conflicts")

@@ -9,7 +9,8 @@ This file is the shared memory between your machines and between sessions. Claud
 ## Current state
 
 - **Branch:** `task/0.3-ci` (PR open against `dev`)
-- **PLAN task:** 0.3 CI, branch model and guards (in progress: waiting for CI on the PR, then merge into `dev` with `uv run poe merge <pr>`, then check the `guard` run on `dev`).
+- **PLAN task:** 0.3 CI, branch model and guards (story #7; in review: CI green, waiting for the owner to read and merge PR #3, then check the `guard` run on `dev`).
+- **Board:** stories are GitHub issues (epics #4, #11, #21, #25, #37, #48, #60, #65). The GitHub Project board is pending the `project` token scope.
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
 - **Next step:** finish 0.3's "Done when", then PLAN 0.4 (local Supabase for integration tests).
 - **Blockers / waiting on (from the client):**
@@ -28,7 +29,8 @@ This file is the shared memory between your machines and between sessions. Claud
 - **Changed:** workflows `ci.yml`, `guard.yml`, `cross-os.yml`, `security.yml`, the shared setup action, Dependabot; actions pinned by SHA. `docker/service.Dockerfile` builds api, worker and mcp (tagged by tree hash, smoke-tested).
 - **Fixed:** torchvision now comes from the PyTorch CPU index too; before, `import open_clip` failed with mismatched builds. The doctor and CI now check the embedding libraries import.
 - **Decisions:** [0019](decisions/0019-branches-environments-cicd.md) branches, environments and CI/CD.
-- **Next:** merge the PR into `dev` once green, check the `guard` run, then PLAN 0.4.
+- **Changed (same PR, second commit):** `docs/handbook/` (plain-language guide: product, stack, decisions with pros and cons, how we ship, working with AI, the board, glossary); reading-before-merge practice (`.github/pull_request_template.md`, `/walkthrough` skill, `poe merge` requires the owner's "I read every changed file" tick); the board: 8 epics, 58 stories and 4 client items as GitHub issues (#4–#73), story 0.2 closed.
+- **Next:** owner reads PR #3 (`/walkthrough 3`), ticks the box, merges with `uv run poe merge 3`; check the `guard` run; create the GitHub Project once the owner grants the `project` scope; then PLAN 0.4.
 - **On the other machine:** `uv sync` (torchvision changed), then `uv run pre-commit install` to add the pre-push hook. Branch from `dev` from now on.
 
 ### 2026-10-13 · pc-wsl · 0.2

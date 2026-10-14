@@ -104,6 +104,22 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
     - Tasks: poe tasks use `cmd`, `script` or `sequence`, never `shell`; helpers are Python under `scripts/`; options are flags, not inline env vars.
     - A change that only works on one OS isn't done.
 
+## Reading before merging
+
+The owner reads and understands **every changed file** before a PR merges.
+
+- Every PR uses `.github/pull_request_template.md`. Fill in the **Reading guide**: every changed file in reading order, what it is, why it exists, and what deserves a close look. Write it for someone who didn't watch you build it.
+- Write code to be read: a module docstring saying what the file is for, names that explain themselves, comments on *why* (not *what*), and no clever one-liners where plain code works.
+- Keep PRs small enough to read in one sitting. Split a PR that grows past that.
+- Never tick the owner's `I read every changed file` box, and never merge for the owner. `uv run poe merge` refuses until the owner ticks it. `/walkthrough <pr>` guides the reading.
+- When the owner challenges a choice, answer honestly; if they're right, change it.
+
+## Tracking work
+
+- The board is the GitHub project for this repo: epics are PLAN phases, stories are PLAN tasks (issue titles start with the PLAN id). See `docs/handbook/06-the-board.md`.
+- A PR says `Closes #<story>`. Move the story's status as work progresses (`/pickup` and `/handoff` do this).
+- Every new decision note also gets a plain-language entry in `docs/handbook/03-decisions.md`, in the same PR. New tools get a row in `docs/handbook/02-the-stack.md`.
+
 ## How to work
 
 - Write tests first for the rule evaluator, the status transitions, the stage contracts, the checks and the scoring. Then implement until green.

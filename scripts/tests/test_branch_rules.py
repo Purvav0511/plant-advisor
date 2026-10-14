@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.branch_rules import checks_passing, is_protected, merge_plan
+from scripts.branch_rules import checks_passing, is_protected, merge_plan, owner_has_read
 from scripts.guard_branch import main as guard_main
 from scripts.merge import rollup_conclusions
 from scripts.verify_push import find_merged_pr, head_check_conclusions
@@ -99,3 +99,11 @@ def test_commit_guard_blocks_protected_branches(monkeypatch):
     assert guard_main(["commit"]) == 1
     monkeypatch.setattr("scripts.guard_branch.current_branch", lambda: "task/x")
     assert guard_main(["commit"]) == 0
+
+
+def test_owner_has_read_needs_the_ticked_box():
+    assert owner_has_read("intro\n- [x] I read every changed file and can explain it\n")
+    assert owner_has_read("* [X] I read every changed file")
+    assert not owner_has_read("- [ ] I read every changed file")
+    assert not owner_has_read("I read every changed file")
+    assert not owner_has_read(None)

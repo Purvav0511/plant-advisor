@@ -26,6 +26,7 @@ disable-model-invocation: true
    - If the last log entry says new raw files were added, run `uv run poe raw-pull`.
 
 5. **Read the context.**
+   - The story for the current PLAN task on the board (`gh issue list --label story --state open`), and move it to *In progress* when work starts.
    - The **Current state** block and the newest **Log** entry in `docs/PROGRESS.md`.
    - The current task in `docs/PLAN.md`, and the SPEC sections that task needs.
 
