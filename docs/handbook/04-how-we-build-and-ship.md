@@ -82,11 +82,12 @@ Dependabot opens update PRs into `dev`, grouped by type (Python, Node, GitHub Ac
 2. Start a session with `/pickup`; Claude syncs and checks the machine.
 3. Branch: `git switch -c task/<id>-<slug>` from `dev`.
 4. Build it: tests first for core logic, then code until `uv run poe check` is green.
-5. `/handoff` (or open the PR): checks, notes in `docs/PROGRESS.md`, push, PR into `dev`.
-6. CI runs. Meanwhile, read the PR: `/walkthrough <pr>` goes through every file with you.
-7. Tick **I read every changed file** in the PR description.
-8. `uv run poe merge <pr>`: it refuses unless the checks are green and the box is ticked. The story closes automatically.
-9. When `dev` has a set of tested changes worth shipping: a release PR from `dev` into `main`.
+5. Claude stops with the changes **uncommitted**. Review them in VS Code (*Source Control*, Ctrl+Shift+G), ask and challenge, then say "commit".
+6. `/handoff` (or open the PR): checks, notes in `docs/PROGRESS.md`, push, PR into `dev`.
+7. CI runs. Re-read anything that changed after your review; `/walkthrough <pr>` helps.
+8. Tick **I read every changed file** in the PR description.
+9. `uv run poe merge <pr>`: it refuses unless the checks are green and the box is ticked. The story closes automatically.
+10. When `dev` has a set of tested changes worth shipping: a release PR from `dev` into `main`.
 
 ## Daily commands
 

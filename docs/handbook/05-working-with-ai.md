@@ -36,6 +36,7 @@ Ask for tests first, then code. Accept "it works" only with evidence: a passing 
 ### 5. Read every file before it merges
 You're the author of record, even when AI typed it. On this project that's enforced:
 - Every PR has a **reading guide**: each changed file in reading order, what it is, why it exists, and what to look at closely.
+- **You review before anything is committed.** When Claude finishes a task, it stops with the changes uncommitted and gives you a reading order. Open the project in VS Code (`code ~/code/plant-advisor`), press Ctrl+Shift+G for *Source Control*, and click each file for a side-by-side diff. Say "commit" when you're satisfied.
 - `/walkthrough <pr>` takes you through it one file at a time in plain words, and stops after each file for your questions.
 - Challenge anything: "why this way?", "what if this is empty?", "what's the alternative?" If the answer isn't good enough, the code changes.
 - `uv run poe merge` refuses until you tick **I read every changed file** in the PR. If you can't explain a change to a colleague, it isn't ready to merge.

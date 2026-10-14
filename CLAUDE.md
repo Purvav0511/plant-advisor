@@ -88,7 +88,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 1. **The model never chooses a product outside the candidate list.** Stage 4 passes candidate IDs, and code rejects any other ID. No free-text product names in outputs.
 2. **Only approved knowledge is used live.** The pipeline reads only rows with `status = 'approved'` (products, rules, vocabulary, playbooks) and only cases created from engineer reviews. Drafts are never used.
 3. **Request status changes only along the allowed-transitions table** in SPEC §6, and only through the DB function `transition_request(request_id, to_status, actor)`, which also writes an `events` row. Never update `requests.status` directly.
-4. **Every pipeline stage is idempotent and checkpointed.** The unique key is `(request_id, attempt, stage)` in `pipeline_runs`. A retry resumes from the last successful stage. Running anything twice must never create a second analysis.
+4. **Every pipeline stage is idempotent and checkpointed.** The unique key is `(request_id, attempt, stage)` in `pipeline_runs`. A retry resumes from the last successful stage. Running anything twice must never create a second analysis for the same attempt (`analyses` is unique on `(request_id, attempt)`); a new attempt adds a row and never replaces one.
 5. **All model calls go through the gateway** at temperature 0, with pinned model IDs and versioned prompts. Record `{model, prompt_version, catalog_version, playbook_version}` in `analyses.versions`.
 6. **Tenant isolation:** every query filters by `tenant_id`, RLS is enabled on every table, and MCP tools are scoped to the caller's tenant.
 7. **Core code never hardcodes a product family.** Family-specific vocabulary, questions, scoring, rules and checks live in `playbooks/<id>/`. Code reads them through the playbook loader.
@@ -109,6 +109,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 
 The owner reads and understands **every changed file** before a PR merges.
 
+- **Review before committing.** When a task's code and checks are done, stop with the changes **uncommitted**, list the changed files in reading order, and wait. The owner reviews the diff in VS Code (Source Control view), asks or challenges, and says "commit". Only then commit, push and open the PR. Fixes found in review are made in place, still uncommitted.
 - Every PR uses `.github/pull_request_template.md`. Fill in the **Reading guide**: every changed file in reading order, what it is, why it exists, and what deserves a close look. Write it for someone who didn't watch you build it.
 - Write code to be read: a module docstring saying what the file is for, names that explain themselves, comments on *why* (not *what*), and no clever one-liners where plain code works.
 - Keep PRs small enough to read in one sitting. Split a PR that grows past that.

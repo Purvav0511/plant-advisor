@@ -149,9 +149,10 @@ pipeline_runs(id, tenant_id, request_id, attempt int, stage text, status text,
               input_hash text, output jsonb, versions jsonb, error text,
               started_at timestamptz, finished_at timestamptz,
               unique (request_id, attempt, stage))
-analyses(request_id uuid primary key, tenant_id, evidence jsonb, diagnosis jsonb,
+analyses(id, tenant_id, request_id, attempt int, evidence jsonb, diagnosis jsonb,
          recommendations jsonb, checks jsonb, confidence numeric, explanation text,
-         flags text[], versions jsonb, cache_key text)
+         flags text[], versions jsonb, cache_key text,
+         unique (request_id, attempt))                -- one per attempt; current = requests.attempt
 reviews(id, tenant_id, request_id, engineer_id, decision text check (decision in ('approved','edited','rejected')),
         final_diagnosis jsonb, final_recommendations jsonb, notes text)
 messages(id, tenant_id, request_id, author_id, body text)

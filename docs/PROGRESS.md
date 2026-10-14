@@ -8,15 +8,24 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/0.5-shared-dev` (PR into `dev`, closes #9)
-- **PLAN task:** 0.5 Shared dev environment (in review). Done here: migration applied to the shared dev DB (doctor: no drift); `raw-push`/`raw-pull` built and tested through the real bucket; CORS rules written and checker built. **Waiting on the owner:** paste the CORS rules in the dashboard, then `uv run poe r2-cors` should pass. The cross-machine "Done when" is completed with the Mac at 0.6.
+- **Branch:** `task/1.1-core-schema` (changes **uncommitted**, waiting for the owner's review in VS Code)
+- **PLAN task:** 1.1 Core schema migration (story #12). Code and checks done: 27 integration tests pass from a fresh database.
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.5 in review, 0.6).
-- **Next step:** owner reads, tests and merges this PR; then PLAN 0.6 (Mac setup), or Phase 1 (1.1 core schema) on this PC.
-- **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73). The 11 data sheets aren't in `data/raw/wear_protection/` yet; put them there and `uv run poe raw-push` when available (needed by 1.7).
-- **On the other machine (Mac):** not set up yet. `.env` from the password manager, including the two new secrets.
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.6, 1.1).
+- **Next step:** owner reviews the uncommitted diff and says "commit"; then PR into `dev`; after merging, apply the migration to the shared dev DB from `dev` (`uv run poe migrate`); then PLAN 1.2 (`transition_request()`).
+- **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73); the 11 data sheets for `data/raw/wear_protection/` (needed by 1.7).
+- **On the other machine (Mac):** not set up yet (PLAN 0.6).
 
 ## Log
+
+### 2026-10-14 · pc-wsl · 1.1
+- **Changed:** migration `20261014225057_core_schema.sql`: the 25 tables of SPEC §5, composite tenant foreign keys, checks on every status-like column, `updated_at` triggers, the SPEC indexes plus per-request lookups, HNSW cosine indexes on all 5 embedding columns, RLS enabled everywhere (no policies until 1.3), and the `requests` / `requests_dlq` queues.
+- **Changed:** `packages/core/tests/integration/test_schema.py` (21 tests: the exact table set, one row per table, cross-tenant links refused, invalid values refused, deletes blocked, `updated_at`, RLS on, vector sizes and indexes, lookup indexes, queues). Queries compose names with `psycopg.sql`.
+- **Changed:** workflow: the owner reviews the uncommitted diff in VS Code before any commit (CLAUDE.md "Review before committing", `/handoff`, handbook 04 and 05).
+- **Changed during review:** `analyses` keeps every attempt (unique `(request_id, attempt)`), the owner's choice; SPEC §5, CLAUDE.md invariant 4 and 0022 updated. New handbook page `07-the-data-model.md`.
+- **Decisions:** [0022](decisions/0022-schema-conventions.md) schema conventions.
+- **Next:** owner's review, then commit and PR; after merge, `uv run poe migrate` from `dev`.
+- **On the other machine:** nothing new beyond `git pull`.
 
 ### 2026-10-14 · pc-wsl · 0.5
 - **Changed:** the shared dev database got migration `20261014020917` (vector 0.8.2, pgmq 1.5.1, same as local); `WORKER_DRAIN_SECRET` and `MCP_SERVICE_TOKEN` generated into `.env` (never printed).
