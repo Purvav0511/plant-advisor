@@ -513,8 +513,10 @@ source: own_photo | client_case | synthetic_ui_only
 | Mac | macOS, arm64 on M-series | Shared hosted dev project; local Supabase for integration tests | Daily development, Safari testing |
 | PC | Ubuntu in WSL2, x86_64 | Same | Daily development, Edge testing |
 | Claude Code cloud session | Ubuntu 24.04, x86_64 | Local Docker Postgres, or dev with custom network access | Coding and unit tests away from a machine |
-| CI | Ubuntu (every push); Windows and macOS (weekly) | Local Supabase on Ubuntu | Gate for merges to `main`; portability check |
-| Production | Linux x86_64 containers (Cloud Run) | Hosted prod project | Live |
+| CI (the `test` environment) | Ubuntu (every push and PR); Windows and macOS (weekly) | Local Supabase on Ubuntu | Gate for merges into `dev` and `main`; portability check |
+| Dev (deployed) | Linux x86_64 containers, from the `dev` branch | Hosted dev project | Integration, demos |
+| Production | Linux x86_64 containers (Cloud Run), from the `main` branch | Hosted prod project | Live |
+| uat, prodtest | Added before the pilot (decision 0019) | Supabase Pro projects | Acceptance; production rehearsal |
 
 - **Code must run on all of these** (CLAUDE.md invariant 15).
 - **Container images** are built only in CI, for `linux/amd64`.

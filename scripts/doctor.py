@@ -226,11 +226,24 @@ def check_location() -> Result:
     return Result(OK, "location", str(REPO_ROOT))
 
 
-def check_pre_commit() -> Result:
-    hook = REPO_ROOT / ".git" / "hooks" / "pre-commit"
-    if hook.exists():
-        return Result(OK, "pre-commit", "hook installed")
-    return Result(WARN, "pre-commit", "hook not installed; run `uv run pre-commit install`")
+def check_git_hooks() -> Result:
+    hooks = REPO_ROOT / ".git" / "hooks"
+    missing = [h for h in ("pre-commit", "pre-push") if not (hooks / h).exists()]
+    if missing:
+        return Result(
+            FAIL, "git hooks", f"missing {', '.join(missing)}; run `uv run pre-commit install`"
+        )
+    return Result(OK, "git hooks", "pre-commit and pre-push installed")
+
+
+def check_ml_stack() -> Result:
+    """torch and torchvision must come from matching builds, or open_clip fails at import."""
+    code = "import torch, torchvision, open_clip; print(torch.__version__, torchvision.__version__)"
+    proc = run_capture([sys.executable, "-c", code], timeout=120)
+    if proc is None or proc.returncode != 0:
+        last = (proc.stderr.strip().splitlines() or ["unknown error"])[-1] if proc else "timeout"
+        return Result(FAIL, "ml stack", f"embedding libraries don't import: {last}")
+    return Result(OK, "ml stack", f"torch {proc.stdout.strip().replace(' ', ', torchvision ')}")
 
 
 def main() -> int:
@@ -246,7 +259,8 @@ def main() -> int:
         *check_database(),
         check_line_endings(),
         check_location(),
-        check_pre_commit(),
+        check_git_hooks(),
+        check_ml_stack(),
     ]
     width = max(len(r.name) for r in results)
     for r in results:

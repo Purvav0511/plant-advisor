@@ -144,7 +144,7 @@ cd plant-advisor
 uv sync                 # installs Python 3.12 if needed, plus every package from uv.lock
 pnpm install            # web app, Playwright and the Supabase CLI, from pnpm-lock.yaml
 cp .env.example .env    # paste the values from your password manager; set DEV_MACHINE (mac / pc-wsl)
-uv run pre-commit install   # blocks client data and secrets from commits; runs ruff
+uv run pre-commit install   # installs the pre-commit and pre-push hooks (client data, secrets, protected branches, ruff)
 uv run poe raw-pull     # client data sheets and private eval photos from R2 (after PLAN 0.5)
 uv run poe doctor       # checks tools, env var names, database, migrations, line endings
 uv run poe check        # lint and unit tests
@@ -217,7 +217,7 @@ This works because Claude Code reads `CLAUDE.md` automatically, and `PROGRESS.md
 
 ### Git habits for two machines
 
-- **One branch per PLAN task,** for example `task/3.4-diagnosis-scoring`. Merge it to `main` through a pull request once CI is green.
+- **One branch per PLAN task,** from `dev`, for example `task/3.4-diagnosis-scoring`. Merge it into `dev` through a pull request with `uv run poe merge <pr>` once CI is green. `main` is production and only takes release PRs from `dev` and hotfixes (decision 0019).
 - **Pull before you start and push before you leave.** `/pickup` and `/handoff` do this for you.
 - **Don't work on the same branch on both machines at once.** If both machines have unpushed commits, `/pickup` stops instead of merging.
 

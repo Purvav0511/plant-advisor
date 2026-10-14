@@ -9,7 +9,7 @@ disable-model-invocation: true
 Goal: someone who opens this repo on the other machine, with no access to this conversation, can continue in under five minutes. Local Claude Code history does not travel between machines; the repo does.
 
 1. **Look at the state.** Run `git status`, `git branch --show-current` and `git log --oneline -5`. Get the machine label with `uv run poe machine` (if that task doesn't exist yet, use the OS name).
-   - If you're on `main` with changes, create a branch first: `task/<plan-id>-<short-slug>`, for example `task/3.4-diagnosis-scoring`. Never commit straight to `main`.
+   - If you're on `dev` or `main` with changes, create a branch from `dev` first: `task/<plan-id>-<short-slug>`, for example `task/3.4-diagnosis-scoring`. Never commit on `dev` or `main` (the hooks refuse it).
 
 2. **Run the checks.** Run `uv run poe check`. Don't start fixing unrelated failures now. Record the result honestly, including which tests fail.
 

@@ -15,7 +15,8 @@ Development happens on a **Mac** and a **Windows PC (inside WSL2 Ubuntu)**, and 
 - **Start** every session with `/pickup`. It syncs, refreshes dependencies, runs the doctor and the checks, and reads `docs/PROGRESS.md`.
 - **End** every session with `/handoff`. It runs the checks, updates `docs/PROGRESS.md`, commits to the task branch and pushes.
 - Anything the next session needs goes in `docs/PROGRESS.md` or `docs/decisions/`, not in chat. That includes manual steps for the other machine: new env var *names*, new tools, migrations, raw files to pull.
-- Use one branch per PLAN task (`task/<id>-<slug>`). Never commit straight to `main`, and never force-push.
+- **Branches** (decision 0019): `dev` is integration and the default branch; `main` is production. Branch each PLAN task from `dev` as `task/<id>-<slug>` and open the PR into `dev`. Never commit on, or push to, `main` or `dev` (git hooks enforce it), and never force-push.
+- Merge only with `uv run poe merge <pr>`, which refuses unless the branch model allows it and every check is green. Releases are a PR `dev` → `main`.
 
 ## Stack
 
@@ -65,6 +66,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 - **`machine`:** prints `DEV_MACHINE` and the OS. Used in `PROGRESS.md` entries.
 - **`check`:** `lint` then `test`. Run it before every commit.
 - **`format`:** apply ruff and prettier formatting.
+- **`merge <pr>`:** merge a PR only if the branch model allows it and its checks are green.
 - **`lint`:** ruff, pyright, eslint and prettier in check mode.
 - **`test`:** unit tests (fast, no network).
 - **`test-int`:** integration tests against local Supabase. It resets that database, never the shared dev one.

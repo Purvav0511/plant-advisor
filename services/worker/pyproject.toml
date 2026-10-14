@@ -9,6 +9,8 @@ dependencies = [
     "uvicorn[standard]",
     # Embeddings run on CPU (CLAUDE.md "Embeddings"); the CPU index is used on Linux and Windows.
     "torch",
+    # Must come from the same index as torch, or its compiled ops don't match.
+    "torchvision",
     "open-clip-torch",
     "sentence-transformers",
 ]
@@ -20,3 +22,4 @@ build-backend = "uv_build"
 [tool.uv.sources]
 advisor-core = { workspace = true }
 torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]

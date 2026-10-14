@@ -1,0 +1,28 @@
+# Dependency update PRs target dev (decision 0019) and are grouped to keep the noise down.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    target-branch: dev
+    schedule: { interval: weekly, day: monday }
+    groups:
+      python:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule: { interval: weekly, day: monday }
+    groups:
+      node:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    target-branch: dev
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /docker
+    target-branch: dev
+    schedule: { interval: monthly }

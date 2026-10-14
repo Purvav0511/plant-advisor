@@ -1,8 +1,17 @@
-# Installed per machine with `uv run pre-commit install` (the doctor warns if it's missing).
-# Fast checks only; `uv run poe check` runs the full lint and tests.
+# Installed per machine with `uv run pre-commit install` (installs both hook types below;
+# the doctor warns if either is missing). Fast checks only; `uv run poe check` runs everything.
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+
 repos:
   - repo: local
     hooks:
+      - id: no-commit-on-protected
+        name: no commits on main or dev
+        entry: uv run python -m scripts.guard_branch commit
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: forbid-private-files
         name: block client data and secrets
         entry: uv run python -m scripts.forbid_private
@@ -18,3 +27,10 @@ repos:
         entry: uv run ruff format
         language: system
         types: [python]
+      - id: no-push-to-protected
+        name: no pushes to main or dev
+        entry: uv run python -m scripts.guard_branch push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

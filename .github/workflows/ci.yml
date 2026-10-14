@@ -1,0 +1,165 @@
+# The gate for every PR and every push to dev and main (PLAN 0.3, decision 0019).
+# Jobs for later PLAN tasks switch themselves on when their files appear (see `detect`).
+name: ci
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  detect:
+    name: detect
+    runs-on: ubuntu-latest
+    outputs:
+      supabase: ${{ steps.files.outputs.supabase }}
+      evals: ${{ steps.files.outputs.evals }}
+      e2e: ${{ steps.files.outputs.e2e }}
+      tree: ${{ steps.files.outputs.tree }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: files
+        shell: bash
+        run: |
+          has() { compgen -G "$1" > /dev/null && echo true || echo false; }
+          {
+            echo "supabase=$(has 'supabase/config.toml')"
+            echo "evals=$(has 'evals/wear_protection/cases/*.yaml')"
+            echo "e2e=$(has 'apps/web/e2e/*')"
+            echo "tree=$(git rev-parse 'HEAD^{tree}')"
+          } >> "$GITHUB_OUTPUT"
+
+  check:
+    name: lint and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: uv run poe check
+      - name: Embedding libraries import (torch and torchvision builds match)
+        run: uv run python -c "import torch, torchvision, open_clip, sentence_transformers"
+
+  web:
+    name: web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          python: "false"
+      - run: pnpm --filter @advisor/web build
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks (checksum verified)
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          file="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "$base/$file"
+          curl -fsSL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " $file\$" | sha256sum -c -
+          tar -xzf "$file" gitleaks
+      - run: ./gitleaks git --redact --no-banner --exit-code 1 .
+
+  integration:
+    name: integration tests
+    needs: detect
+    if: needs.detect.outputs.supabase == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: uv run poe db-up
+      - run: uv run poe test-int
+
+  eval:
+    name: eval gate
+    needs: detect
+    if: needs.detect.outputs.evals == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: uv run poe eval
+
+  e2e:
+    name: end-to-end
+    needs: detect
+    if: needs.detect.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: uv run poe e2e
+
+  images:
+    name: image ${{ matrix.service.name }}
+    needs: detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: api
+            package: advisor-api
+            dir: services/api
+            cmd: uvicorn advisor_api.main:app --host 0.0.0.0 --port $PORT
+            smoke: import advisor_api.main
+          - name: worker
+            package: advisor-worker
+            dir: services/worker
+            cmd: uvicorn advisor_worker.main:app --host 0.0.0.0 --port $PORT
+            smoke: import advisor_worker.main, torch, torchvision, open_clip, sentence_transformers
+          - name: mcp
+            package: advisor-mcp
+            dir: services/mcp
+            cmd: python -m advisor_mcp --host 0.0.0.0 --port $PORT
+            smoke: import advisor_mcp.server
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # Images are tagged by git tree hash: dev's tested build is reused for main when
+      # the trees match (decision 0019). Pushing to a registry starts at PLAN 7.3.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/service.Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            PACKAGE=${{ matrix.service.package }}
+            SERVICE_DIR=${{ matrix.service.dir }}
+            SERVICE_CMD=${{ matrix.service.cmd }}
+            SOURCE_TREE=${{ needs.detect.outputs.tree }}
+          tags: plant-advisor/${{ matrix.service.name }}:tree-${{ needs.detect.outputs.tree }}
+          load: true
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+      - name: Smoke test the image
+        env:
+          IMAGE: plant-advisor/${{ matrix.service.name }}:tree-${{ needs.detect.outputs.tree }}
+          SMOKE: ${{ matrix.service.smoke }}
+        run: docker run --rm --entrypoint python "$IMAGE" -c "$SMOKE"

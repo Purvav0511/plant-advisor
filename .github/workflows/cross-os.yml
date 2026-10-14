@@ -1,0 +1,43 @@
+# Portability check on Windows and macOS (CLAUDE.md invariant 15). Runner minutes on these
+# cost more than Linux, so it runs weekly, by hand before a release, and on PRs that change
+# what most often breaks on another OS: dependencies, CI config and the task scripts.
+name: cross-os
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - uv.lock
+      - pnpm-lock.yaml
+      - pyproject.toml
+      - package.json
+      - "**/pyproject.toml"
+      - .github/**
+      - scripts/**
+
+concurrency:
+  group: cross-os-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: uv run poe check
+      - name: Embedding libraries import (torch and torchvision builds match)
+        run: uv run python -c "import torch, torchvision, open_clip, sentence_transformers"
+      - run: pnpm --filter @advisor/web build

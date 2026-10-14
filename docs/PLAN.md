@@ -55,7 +55,9 @@ Done when:
 - `uv run poe check` and `uv run poe doctor` pass on the empty skeleton.
 - `git ls-files --eol` shows no CRLF text files.
 
-**0.3 CI**
+**0.3 CI, branch model and guards** (decision 0019)
+- Create `dev` from `main` and make it the default branch. Add the free stand-ins for branch protection: pre-commit and pre-push hooks, `uv run poe merge`, and the `guard` workflow.
+- A shared Dockerfile for the services, tagged by git tree hash, with smoke tests. Dependabot into `dev`; weekly `security.yml`; gitleaks on every run.
 - `ci.yml`, on every push and PR, on Ubuntu:
   - lint, unit tests, and the web lint, typecheck and build
   - integration tests (`supabase start` from the pinned CLI)
@@ -66,7 +68,7 @@ Done when:
   - `uv sync`, `uv run poe check` (unit only, no Docker), `pnpm install`, and the web build
 - Container images are built for `linux/amd64` in CI only (used at 7.3).
 
-Done when: a pull request shows green checks, and a manual `cross-os` run is green on both operating systems.
+Done when: a pull request into `dev` shows green checks and merges with `poe merge`, the `guard` run on `dev` passes, and a manual `cross-os` run is green on both operating systems.
 
 **0.4 Local Supabase (integration tests only)**
 - Run `pnpm exec supabase init`, and enable the `vector` and `pgmq` extensions in the first migration.
@@ -369,6 +371,9 @@ Done when: the report shows the pipeline against the baseline on held-out cases,
 
 **7.3 Deploy**
 - First, decide Cloud Run vs AWS with the measured per-request time from 7.1 and the company's infrastructure needs (decision 0009), and record the outcome as a decision note.
+- Push images to the registry by tree hash. A push to `dev` deploys the dev environment; a release merge into `main` deploys **the image already built for that tree** to prod, and refuses if there isn't one (decision 0019). Migrations run in the pipeline only.
+- Serve a per-environment `config.json` for the web app, so one build serves every environment.
+- Before the pilot: GitHub Pro and Supabase Pro, the `uat` and `prodtest` environments, and remove the stand-ins that real branch protection replaces.
 - Cloud Run services (api, worker, mcp), using images built in CI for `linux/amd64`.
 - Cloud Scheduler hitting `/drain` every minute. Check that the API's kick before responding reaches the worker.
 - The web app on Cloudflare Pages, with a preview deployment per pull request that points at a dev API.

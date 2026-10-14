@@ -1,0 +1,12 @@
+# Allowlist: the image build only needs the Python workspace.
+*
+!pyproject.toml
+!uv.lock
+!packages/
+!services/
+!ingestion/pyproject.toml
+!evals/pyproject.toml
+**/__pycache__
+**/tests
+**/.venv
+**/*.pyc
