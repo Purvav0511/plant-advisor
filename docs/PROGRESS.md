@@ -8,19 +8,30 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/0.2-skeleton` (PR open against `main`)
-- **PLAN task:** 0.2 Repository skeleton and task runner (done; "Done when" passes on pc-wsl)
-- **Next step:** merge the PR, then PLAN 0.3 (CI: `ci.yml` on Ubuntu, `cross-os.yml` weekly on Windows and macOS).
+- **Branch:** `task/0.3-ci` (PR open against `dev`)
+- **PLAN task:** 0.3 CI, branch model and guards (story #7; in review: CI green, waiting for the owner to read and merge PR #3, then check the `guard` run on `dev`).
+- **Board:** stories are GitHub issues (epics #4, #11, #21, #25, #37, #48, #60, #65). The GitHub Project board is pending the `project` token scope.
+- **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
+- **Next step:** finish 0.3's "Done when", then PLAN 0.4 (local Supabase for integration tests).
 - **Blockers / waiting on (from the client):**
   - the five-level wear scale for 9 products
   - missing composition values
   - the corrected carbon range for one wire
   - the missing product description (SPEC §18)
-- **Waiting on the owner:** Supabase dev project (asymmetric JWT keys) and R2 bucket before PLAN 0.5.
-- **Last check:** `uv run poe check` green (23 tests); `uv run poe doctor` 0 failed, 2 warnings (empty env values, no database yet) on pc-wsl.
-- **On the other machine (Mac):** not set up yet. See the newest log entry.
+- **Waiting on the owner:** Supabase dev project (asymmetric JWT keys) and R2 bucket before PLAN 0.5. No paid plans until after the MVP (decision 0019 says when to switch).
+- **Last check:** `uv run poe check` green (42 tests); `uv run poe doctor` 0 failed, 2 warnings (empty env values, no database yet) on pc-wsl.
+- **On the other machine (Mac):** not set up yet. After cloning, run `uv run pre-commit install` (it now installs the pre-push hook too).
 
 ## Log
+
+### 2026-10-13 · pc-wsl · 0.3
+- **Changed:** `dev` branch created and made the default; branch model and free stand-ins for branch protection: `scripts/branch_rules.py`, `guard_branch.py` (pre-commit and pre-push hooks), `merge.py` (`poe merge`), `verify_push.py` (`guard` workflow).
+- **Changed:** workflows `ci.yml`, `guard.yml`, `cross-os.yml`, `security.yml`, the shared setup action, Dependabot; actions pinned by SHA. `docker/service.Dockerfile` builds api, worker and mcp (tagged by tree hash, smoke-tested).
+- **Fixed:** torchvision now comes from the PyTorch CPU index too; before, `import open_clip` failed with mismatched builds. The doctor and CI now check the embedding libraries import.
+- **Decisions:** [0019](decisions/0019-branches-environments-cicd.md) branches, environments and CI/CD.
+- **Changed (same PR, second commit):** `docs/handbook/` (plain-language guide: product, stack, decisions with pros and cons, how we ship, working with AI, the board, glossary); reading-before-merge practice (`.github/pull_request_template.md`, `/walkthrough` skill, `poe merge` requires the owner's "I read every changed file" tick); the board: 8 epics, 58 stories and 4 client items as GitHub issues (#4–#73), story 0.2 closed.
+- **Next:** owner reads PR #3 (`/walkthrough 3`), ticks the box, merges with `uv run poe merge 3`; check the `guard` run; create the GitHub Project once the owner grants the `project` scope; then PLAN 0.4.
+- **On the other machine:** `uv sync` (torchvision changed), then `uv run pre-commit install` to add the pre-push hook. Branch from `dev` from now on.
 
 ### 2026-10-13 · pc-wsl · 0.2
 - **Changed:** uv workspace (`packages/core`, `services/api|worker|mcp`, `ingestion`, `evals`; `src` layout, `advisor_*` names) with a universal `uv.lock` (PyTorch CPU index on Linux and Windows, PyPI on macOS); pnpm workspace with `apps/web` (Next.js 16.3.8, static export, Tailwind) and the root `package.json` (Supabase CLI 2.118.0, Playwright 1.63.0).

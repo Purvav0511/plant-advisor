@@ -14,7 +14,7 @@ disable-model-invocation: true
 2. **Find the latest work.**
    - Run `git fetch --prune`.
    - List the most recently updated branches: `git for-each-ref --sort=-committerdate refs/remotes/origin --count=5 --format="%(refname:short) | %(committerdate:relative) | %(subject)"`.
-   - The newest `task/*` branch, or `main`, is usually where the last `/handoff` pushed. If it isn't obvious, ask.
+   - The newest `task/*` branch, or `dev`, is usually where the last `/handoff` pushed. If it isn't obvious, ask.
 
 3. **Sync.**
    - Check out that branch (tracking the remote) and run `git pull --ff-only`.
@@ -26,6 +26,7 @@ disable-model-invocation: true
    - If the last log entry says new raw files were added, run `uv run poe raw-pull`.
 
 5. **Read the context.**
+   - The story for the current PLAN task on the board (`gh issue list --label story --state open`), and move it to *In progress* when work starts.
    - The **Current state** block and the newest **Log** entry in `docs/PROGRESS.md`.
    - The current task in `docs/PLAN.md`, and the SPEC sections that task needs.
 

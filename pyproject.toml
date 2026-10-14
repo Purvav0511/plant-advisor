@@ -74,6 +74,10 @@ sequence = [
     { cmd = "python -m scripts.pnpm --filter @advisor/web format:check" },
 ]
 
+[tool.poe.tasks.merge]
+help = "Merge a PR if the branch model allows it and its checks are green: poe merge <pr>"
+cmd = "python -m scripts.merge"
+
 [tool.poe.tasks.format]
 help = "Apply ruff and prettier formatting"
 sequence = [

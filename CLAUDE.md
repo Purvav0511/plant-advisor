@@ -15,7 +15,8 @@ Development happens on a **Mac** and a **Windows PC (inside WSL2 Ubuntu)**, and 
 - **Start** every session with `/pickup`. It syncs, refreshes dependencies, runs the doctor and the checks, and reads `docs/PROGRESS.md`.
 - **End** every session with `/handoff`. It runs the checks, updates `docs/PROGRESS.md`, commits to the task branch and pushes.
 - Anything the next session needs goes in `docs/PROGRESS.md` or `docs/decisions/`, not in chat. That includes manual steps for the other machine: new env var *names*, new tools, migrations, raw files to pull.
-- Use one branch per PLAN task (`task/<id>-<slug>`). Never commit straight to `main`, and never force-push.
+- **Branches** (decision 0019): `dev` is integration and the default branch; `main` is production. Branch each PLAN task from `dev` as `task/<id>-<slug>` and open the PR into `dev`. Never commit on, or push to, `main` or `dev` (git hooks enforce it), and never force-push.
+- Merge only with `uv run poe merge <pr>`, which refuses unless the branch model allows it and every check is green. Releases are a PR `dev` → `main`.
 
 ## Stack
 
@@ -65,6 +66,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 - **`machine`:** prints `DEV_MACHINE` and the OS. Used in `PROGRESS.md` entries.
 - **`check`:** `lint` then `test`. Run it before every commit.
 - **`format`:** apply ruff and prettier formatting.
+- **`merge <pr>`:** merge a PR only if the branch model allows it and its checks are green.
 - **`lint`:** ruff, pyright, eslint and prettier in check mode.
 - **`test`:** unit tests (fast, no network).
 - **`test-int`:** integration tests against local Supabase. It resets that database, never the shared dev one.
@@ -101,6 +103,22 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
     - Processes: subprocess with argument lists and no `shell=True`; find external tools with `shutil.which` or an env var.
     - Tasks: poe tasks use `cmd`, `script` or `sequence`, never `shell`; helpers are Python under `scripts/`; options are flags, not inline env vars.
     - A change that only works on one OS isn't done.
+
+## Reading before merging
+
+The owner reads and understands **every changed file** before a PR merges.
+
+- Every PR uses `.github/pull_request_template.md`. Fill in the **Reading guide**: every changed file in reading order, what it is, why it exists, and what deserves a close look. Write it for someone who didn't watch you build it.
+- Write code to be read: a module docstring saying what the file is for, names that explain themselves, comments on *why* (not *what*), and no clever one-liners where plain code works.
+- Keep PRs small enough to read in one sitting. Split a PR that grows past that.
+- Never tick the owner's `I read every changed file` box, and never merge for the owner. `uv run poe merge` refuses until the owner ticks it. `/walkthrough <pr>` guides the reading.
+- When the owner challenges a choice, answer honestly; if they're right, change it.
+
+## Tracking work
+
+- The board is the GitHub project for this repo: epics are PLAN phases, stories are PLAN tasks (issue titles start with the PLAN id). See `docs/handbook/06-the-board.md`.
+- A PR says `Closes #<story>`. Move the story's status as work progresses (`/pickup` and `/handoff` do this).
+- Every new decision note also gets a plain-language entry in `docs/handbook/03-decisions.md`, in the same PR. New tools get a row in `docs/handbook/02-the-stack.md`.
 
 ## How to work
 

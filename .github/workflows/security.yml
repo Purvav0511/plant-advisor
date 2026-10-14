@@ -1,0 +1,33 @@
+# Weekly dependency audit. Not a PR gate: new advisories appear without code changes,
+# so this reports on its own schedule instead of breaking unrelated PRs.
+name: security
+
+on:
+  schedule:
+    - cron: "0 6 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          python: "false"
+      - name: Python (pip-audit over uv.lock)
+        run: |
+          uv export --frozen --no-hashes --no-emit-workspace --format requirements-txt -o requirements.txt
+          uvx pip-audit==2.10.1 -r requirements.txt --no-deps --disable-pip --progress-spinner off
+      - name: Node, shipped dependencies (fails on high)
+        if: always()
+        run: pnpm audit --prod --audit-level high
+      - name: Node, dev tooling (report only)
+        if: always()
+        # Lint and build tools never ship in the static export; review these by hand.
+        run: pnpm audit --dev || true

@@ -9,7 +9,7 @@ disable-model-invocation: true
 Goal: someone who opens this repo on the other machine, with no access to this conversation, can continue in under five minutes. Local Claude Code history does not travel between machines; the repo does.
 
 1. **Look at the state.** Run `git status`, `git branch --show-current` and `git log --oneline -5`. Get the machine label with `uv run poe machine` (if that task doesn't exist yet, use the OS name).
-   - If you're on `main` with changes, create a branch first: `task/<plan-id>-<short-slug>`, for example `task/3.4-diagnosis-scoring`. Never commit straight to `main`.
+   - If you're on `dev` or `main` with changes, create a branch from `dev` first: `task/<plan-id>-<short-slug>`, for example `task/3.4-diagnosis-scoring`. Never commit on `dev` or `main` (the hooks refuse it).
 
 2. **Run the checks.** Run `uv run poe check`. Don't start fixing unrelated failures now. Record the result honestly, including which tests fail.
 
@@ -25,11 +25,14 @@ Goal: someone who opens this repo on the other machine, with no access to this c
    - If new client documents or private photos were added on this machine, run `uv run poe raw-push` so the other machine can pull them.
 
 5. **Commit** the task's files and `docs/PROGRESS.md`.
+   - If you wrote a decision note this session, its plain-language entry in `docs/handbook/03-decisions.md` must be in the same commit.
    - If the task's "Done when" check passes, use the message `<plan-id>: <summary>`.
    - Otherwise use `<plan-id>: WIP - <what's left>`.
    - Never use `--no-verify`.
 
 6. **Push** with `git push -u origin <branch>`. Never force-push. If the push fails (network or auth), say so plainly: the handoff isn't finished until the branch is on GitHub.
+   - If the task's "Done when" passes and no PR exists yet, open one into `dev` from `.github/pull_request_template.md`, with `Closes #<story>` and a complete **Reading guide**. Leave the owner's sign-off box unticked.
+   - Move the story on the board: *In review* when a PR is open, otherwise *In progress*.
 
 7. **Report** in at most six lines:
    - the branch you pushed and the check result
