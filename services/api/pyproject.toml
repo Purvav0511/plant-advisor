@@ -1,0 +1,17 @@
+[project]
+name = "advisor-api"
+version = "0.1.0"
+description = "FastAPI service: requests, uploads, reviews, quotes, knowledge."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "advisor-core",
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+advisor-core = { workspace = true }

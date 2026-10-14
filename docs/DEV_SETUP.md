@@ -144,6 +144,7 @@ cd plant-advisor
 uv sync                 # installs Python 3.12 if needed, plus every package from uv.lock
 pnpm install            # web app, Playwright and the Supabase CLI, from pnpm-lock.yaml
 cp .env.example .env    # paste the values from your password manager; set DEV_MACHINE (mac / pc-wsl)
+uv run pre-commit install   # blocks client data and secrets from commits; runs ruff
 uv run poe raw-pull     # client data sheets and private eval photos from R2 (after PLAN 0.5)
 uv run poe doctor       # checks tools, env var names, database, migrations, line endings
 uv run poe check        # lint and unit tests

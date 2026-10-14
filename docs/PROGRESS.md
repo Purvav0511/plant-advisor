@@ -8,18 +8,27 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/0.1-design-decisions` (PR open against `main`)
-- **PLAN task:** 0.1 Accounts and secrets (in progress). Design decisions done; accounts not created yet.
-- **Next step:** merge the design-decisions PR, then start PLAN 0.2 (repository skeleton and task runner) on `task/0.2-skeleton`. Accounts can be created as each one is needed (PLAN 0.1 lists when).
+- **Branch:** `task/0.2-skeleton` (PR open against `main`)
+- **PLAN task:** 0.2 Repository skeleton and task runner (done; "Done when" passes on pc-wsl)
+- **Next step:** merge the PR, then PLAN 0.3 (CI: `ci.yml` on Ubuntu, `cross-os.yml` weekly on Windows and macOS).
 - **Blockers / waiting on (from the client):**
   - the five-level wear scale for 9 products
   - missing composition values
   - the corrected carbon range for one wire
   - the missing product description (SPEC §18)
-- **Last check:** not run yet (no `poe` tasks until 0.2)
-- **On the other machine (Mac):** clone `https://github.com/Purvav0511/plant-advisor` into `~/code/plant-advisor`, install the tools per `docs/DEV_SETUP.md` §4a, then `/pickup`.
+- **Waiting on the owner:** Supabase dev project (asymmetric JWT keys) and R2 bucket before PLAN 0.5.
+- **Last check:** `uv run poe check` green (23 tests); `uv run poe doctor` 0 failed, 2 warnings (empty env values, no database yet) on pc-wsl.
+- **On the other machine (Mac):** not set up yet. See the newest log entry.
 
 ## Log
+
+### 2026-10-13 · pc-wsl · 0.2
+- **Changed:** uv workspace (`packages/core`, `services/api|worker|mcp`, `ingestion`, `evals`; `src` layout, `advisor_*` names) with a universal `uv.lock` (PyTorch CPU index on Linux and Windows, PyPI on macOS); pnpm workspace with `apps/web` (Next.js 16.3.8, static export, Tailwind) and the root `package.json` (Supabase CLI 2.118.0, Playwright 1.63.0).
+- **Changed:** every poe task from CLAUDE.md in the root `pyproject.toml` (later tasks print which PLAN task brings them); `scripts/` doctor, machine, serve, dev, pnpm wrapper, private-file guard, with unit tests.
+- **Changed:** ruff (pathlib, encoding and no-`shell=True` rules), pyright (strict in core), eslint, tsc (after `next typegen`), prettier; pre-commit hooks; minimal `/health` API and worker, an MCP v2 server with no tools yet.
+- **Decisions:** [0018](decisions/0018-python-package-layout.md) package layout. The MCP SDK is v2 (`MCPServer`, not `FastMCP`).
+- **Next:** PLAN 0.3 (CI).
+- **On the other machine:** after cloning, `uv sync`, `pnpm install`, `cp .env.example .env` (set `DEV_MACHINE=mac`), `uv run pre-commit install`, then `uv run poe doctor` and `uv run poe check`.
 
 ### 2026-10-13 · pc-wsl · 0.1
 - **Changed:** created the private repo `Purvav0511/plant-advisor` from the handoff package; added decision notes 0002–0017; updated SPEC (v3), PLAN, CLAUDE.md (invariants 13 and 14 added, cross-platform is now 15), DEV_SETUP, `.env.example` (email vars); pinned `@playwright/mcp`; added `.nvmrc`.

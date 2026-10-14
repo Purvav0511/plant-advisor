@@ -1,0 +1,199 @@
+# Root of the uv workspace. It isn't a package itself: it holds the dev tools,
+# the task runner (poethepoet) and the shared tool configs.
+[project]
+name = "plant-advisor"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "advisor-core",
+    "advisor-api",
+    "advisor-worker",
+    "advisor-mcp",
+    "advisor-ingestion",
+    "advisor-evals",
+]
+
+[dependency-groups]
+dev = [
+    "poethepoet",
+    "ruff",
+    "pyright[nodejs]",
+    "pytest",
+    "hypothesis",
+    "httpx",
+    "pre-commit",
+    "psycopg[binary]",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/core", "services/*", "ingestion", "evals"]
+
+[tool.uv.sources]
+advisor-core = { workspace = true }
+advisor-api = { workspace = true }
+advisor-worker = { workspace = true }
+advisor-mcp = { workspace = true }
+advisor-ingestion = { workspace = true }
+advisor-evals = { workspace = true }
+
+# PyTorch CPU wheels for Linux and Windows; macOS uses PyPI (uv's PyTorch guide).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+# ---------------------------------------------------------------------------
+# Tasks: `uv run poe <task>`. Only cmd, script and sequence tasks (CLAUDE.md invariant 15).
+# ---------------------------------------------------------------------------
+[tool.poe]
+envfile = ".env"
+
+[tool.poe.tasks.doctor]
+help = "Check tools, env var names, database, migrations, line endings and repo location"
+cmd = "python -m scripts.doctor"
+
+[tool.poe.tasks.machine]
+help = "Print DEV_MACHINE and the OS"
+cmd = "python -m scripts.machine"
+
+[tool.poe.tasks.check]
+help = "Lint, then unit tests. Run before every commit"
+sequence = ["lint", "test"]
+
+[tool.poe.tasks.lint]
+help = "ruff, pyright, eslint, tsc and prettier in check mode"
+sequence = [
+    { cmd = "ruff check ." },
+    { cmd = "ruff format --check ." },
+    { cmd = "pyright" },
+    { cmd = "python -m scripts.pnpm --filter @advisor/web lint" },
+    { cmd = "python -m scripts.pnpm --filter @advisor/web typecheck" },
+    { cmd = "python -m scripts.pnpm --filter @advisor/web format:check" },
+]
+
+[tool.poe.tasks.format]
+help = "Apply ruff and prettier formatting"
+sequence = [
+    { cmd = "ruff check --fix ." },
+    { cmd = "ruff format ." },
+    { cmd = "python -m scripts.pnpm --filter @advisor/web format" },
+]
+
+[tool.poe.tasks.test]
+help = "Unit tests (fast, no network)"
+cmd = "pytest -m 'not integration and not live'"
+
+[tool.poe.tasks.test-int]
+help = "Integration tests against local Supabase (PLAN 0.4)"
+cmd = "python -m scripts.not_yet test-int 0.4"
+
+[tool.poe.tasks.db-up]
+help = "Start local Supabase in Docker (PLAN 0.4)"
+cmd = "python -m scripts.not_yet db-up 0.4"
+
+[tool.poe.tasks.db-down]
+help = "Stop local Supabase (PLAN 0.4)"
+cmd = "python -m scripts.not_yet db-down 0.4"
+
+[tool.poe.tasks.migrate]
+help = "Apply migrations to the shared dev DB; --local for local Supabase (PLAN 0.4)"
+cmd = "python -m scripts.not_yet migrate 0.4"
+
+[tool.poe.tasks.seed]
+help = "Load demo data (PLAN 1.4)"
+cmd = "python -m scripts.not_yet seed 1.4"
+
+[tool.poe.tasks.api]
+help = "Run the API on API_PORT (8000)"
+cmd = "python -m scripts.serve api"
+
+[tool.poe.tasks.worker]
+help = "Run the worker on WORKER_PORT (8001)"
+cmd = "python -m scripts.serve worker"
+
+[tool.poe.tasks.mcp]
+help = "Run the MCP server on MCP_PORT (8002)"
+cmd = "python -m scripts.serve mcp"
+
+[tool.poe.tasks.web]
+help = "Run the web app on port 3000"
+cmd = "python -m scripts.pnpm --filter @advisor/web dev"
+
+[tool.poe.tasks.dev]
+help = "Run api, worker and web together with prefixed output"
+cmd = "python -m scripts.dev"
+
+[tool.poe.tasks.ingest]
+help = "Ingest data sheets for a family (PLAN 1.7)"
+cmd = "python -m scripts.not_yet ingest 1.7"
+
+[tool.poe.tasks.eval]
+help = "Run the pipeline and baseline on the eval set; --live calls real models (PLAN 2.2)"
+cmd = "python -m scripts.not_yet eval 2.2"
+
+[tool.poe.tasks.eval-report]
+help = "Write evals/reports/<date>.md (PLAN 2.2)"
+cmd = "python -m scripts.not_yet eval-report 2.2"
+
+[tool.poe.tasks.e2e]
+help = "Playwright end-to-end tests (PLAN 5.10)"
+cmd = "python -m scripts.not_yet e2e 5.10"
+
+[tool.poe.tasks.phone]
+help = "HTTPS tunnels for testing on a real phone (PLAN 5.10)"
+cmd = "python -m scripts.not_yet phone 5.10"
+
+[tool.poe.tasks.raw-pull]
+help = "Pull client documents and private photos from R2 (PLAN 0.5)"
+cmd = "python -m scripts.not_yet raw-pull 0.5"
+
+[tool.poe.tasks.raw-push]
+help = "Push client documents and private photos to R2 (PLAN 0.5)"
+cmd = "python -m scripts.not_yet raw-push 0.5"
+
+# ---------------------------------------------------------------------------
+# Tool configs
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["apps", "node_modules", "data", "evals/recordings"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "UP", "B", "SIM", "RUF", "C4", "PTH",
+    # Cross-platform rules (CLAUDE.md invariant 15): no shell=True, explicit encodings.
+    "S602", "S604", "S605", "PLW1510", "PLW1514",
+]
+preview = true
+explicit-preview-rules = true
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "advisor_core", "advisor_api", "advisor_worker", "advisor_mcp",
+    "advisor_ingestion", "advisor_evals", "scripts",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+include = ["packages", "services", "ingestion", "evals", "scripts"]
+exclude = ["**/node_modules", "**/__pycache__", "apps", "evals/recordings"]
+typeCheckingMode = "standard"
+strict = ["packages/core/src"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib", "--strict-markers", "-q"]
+pythonpath = ["."]
+testpaths = ["packages", "services", "ingestion", "evals", "scripts/tests"]
+markers = [
+    "integration: needs local Supabase (uv run poe test-int)",
+    "live: calls real model APIs (only with --live)",
+]

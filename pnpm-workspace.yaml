@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+
+# pnpm only runs install scripts for packages listed here.
+allowBuilds:
+  # The Supabase CLI downloads its binary in postinstall.
+  supabase: true
+  sharp: false
+  unrs-resolver: false
