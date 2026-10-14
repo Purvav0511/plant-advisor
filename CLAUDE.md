@@ -54,6 +54,9 @@ docs/                     SPEC.md, PLAN.md, DEV_SETUP.md, PROGRESS.md, decisions
 .claude/                  settings.json, skills/ (handoff, pickup). Committed
 ```
 
+Python members use the `src` layout with `advisor_*` import names (decision 0018): a path like
+`packages/core/playbooks/loader.py` in the docs means `packages/core/src/advisor_core/playbooks/loader.py`.
+
 ## Commands (create these in PLAN task 0.2)
 
 All commands are `uv run poe <task>`, and they behave the same on the Mac, in WSL and on native Windows.
@@ -61,6 +64,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 - **`doctor`:** checks tool versions, env var *names* against `.env.example`, database reachability, migration drift and line endings. Prints the machine label.
 - **`machine`:** prints `DEV_MACHINE` and the OS. Used in `PROGRESS.md` entries.
 - **`check`:** `lint` then `test`. Run it before every commit.
+- **`format`:** apply ruff and prettier formatting.
 - **`lint`:** ruff, pyright, eslint and prettier in check mode.
 - **`test`:** unit tests (fast, no network).
 - **`test-int`:** integration tests against local Supabase. It resets that database, never the shared dev one.

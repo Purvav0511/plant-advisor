@@ -1,0 +1,22 @@
+[project]
+name = "advisor-worker"
+version = "0.1.0"
+description = "Queue worker: runs the pipeline (drain endpoint and loop mode)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "advisor-core",
+    "fastapi",
+    "uvicorn[standard]",
+    # Embeddings run on CPU (CLAUDE.md "Embeddings"); the CPU index is used on Linux and Windows.
+    "torch",
+    "open-clip-torch",
+    "sentence-transformers",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+advisor-core = { workspace = true }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
