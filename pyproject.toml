@@ -91,20 +91,20 @@ help = "Unit tests (fast, no network)"
 cmd = "pytest -m 'not integration and not live'"
 
 [tool.poe.tasks.test-int]
-help = "Integration tests against local Supabase (PLAN 0.4)"
-cmd = "python -m scripts.not_yet test-int 0.4"
+help = "Integration tests: resets local Supabase, then runs tests marked integration"
+cmd = "python -m scripts.db test-int"
 
 [tool.poe.tasks.db-up]
-help = "Start local Supabase in Docker (PLAN 0.4)"
-cmd = "python -m scripts.not_yet db-up 0.4"
+help = "Start local Supabase in Docker (only what the tests need)"
+cmd = "python -m scripts.db up"
 
 [tool.poe.tasks.db-down]
-help = "Stop local Supabase (PLAN 0.4)"
-cmd = "python -m scripts.not_yet db-down 0.4"
+help = "Stop local Supabase"
+cmd = "python -m scripts.db down"
 
 [tool.poe.tasks.migrate]
-help = "Apply migrations to the shared dev DB; --local for local Supabase (PLAN 0.4)"
-cmd = "python -m scripts.not_yet migrate 0.4"
+help = "Apply migrations to the shared dev DB; --local for local Supabase"
+cmd = "python -m scripts.db migrate"
 
 [tool.poe.tasks.seed]
 help = "Load demo data (PLAN 1.4)"

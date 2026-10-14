@@ -39,7 +39,7 @@ hotfix/urgent-fix ──PR──▶ main, then main ──PR──▶ dev
 | Web build | A website that wouldn't build |
 | Secret scan (gitleaks) | Passwords or keys accidentally committed |
 | Images (api, worker, mcp) | Services that wouldn't package or start |
-| Integration tests *(from 0.4)* | Code that breaks against a real database |
+| Integration tests | Code that breaks against a real database (a throwaway local Supabase, reset before every run) |
 | Eval gate *(from 2.2)* | Changes that make recommendations less accurate |
 | End-to-end *(from 5.10)* | Broken user flows in real browsers |
 | Windows and macOS *(weekly, and on dependency changes)* | Code that only works on Linux |
