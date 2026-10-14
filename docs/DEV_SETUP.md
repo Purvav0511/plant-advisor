@@ -108,6 +108,7 @@ Note: macOS uses ports 5000 and 7000 for AirPlay Receiver. The project avoids th
    curl -LsSf https://astral.sh/uv/install.sh | sh
    curl -fsSL https://fnm.vercel.app/install | bash && exec bash
    fnm install 22 && corepack enable
+   # nvm works too (the repo has .nvmrc): nvm install 22 && corepack enable
    sudo apt install -y --no-install-recommends libreoffice-writer   # only for .doc conversion (PLAN 1.7)
    ```
    - **cloudflared:** install the Linux package from Cloudflare's downloads page or their apt repository.
@@ -242,7 +243,7 @@ This works because Claude Code reads `CLAUDE.md` automatically, and `PROGRESS.md
 
 ## 8. Cross-platform rules for code
 
-Claude Code follows these through CLAUDE.md invariant 13.
+Claude Code follows these through CLAUDE.md invariant 15.
 
 - **Paths:** use `pathlib` everywhere, and `tempfile` instead of `/tmp`. Never use string paths with `/` or `\`.
 - **Encoding:** open text files with `encoding="utf-8"`, because Windows doesn't default to UTF-8 on Python 3.12. Use `newline=""` for CSV files.
@@ -271,3 +272,4 @@ Claude Code follows these through CLAUDE.md invariant 13.
 | Playwright can't find a browser | `pnpm exec playwright install --with-deps chromium webkit` (on WSL, `--with-deps` installs system libraries) |
 | `claude --teleport` refuses to run | Commit or stash local changes, make sure the session's branch is pushed, and check you're signed in to the same account |
 | Mac: port 5000 or 7000 is busy | That's AirPlay Receiver. The project doesn't use those ports |
+| `corepack` fails with "Cannot find matching keyid" | The Node 22 build is too old for npm's current signing keys. Install the latest Node 22 (`fnm install 22` or `nvm install 22`) |

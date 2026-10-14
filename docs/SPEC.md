@@ -1,6 +1,8 @@
-# Plant Advisor: Technical Specification (v2)
+# Plant Advisor: Technical Specification (v3)
 
 This is the source of truth for what to build. `docs/PLAN.md` orders the work; `CLAUDE.md` holds the rules.
+
+v3 (2026-10-13) applies decisions 0002–0017 in `docs/decisions/`. Where a section cites a decision, the decision note has the reasoning.
 
 ---
 
@@ -11,16 +13,16 @@ This is the source of truth for what to build. `docs/PLAN.md` orders the work; `
 **Problem:** when a component in a plant wears out or fails, the technician contacts the supplier. A sales engineer then goes back and forth to work out what's wrong and what to sell. That's slow, error-prone, and it misses chances to recommend longer-lasting products.
 
 **Product:** two apps joined by a queue.
-- **Plant app:** a technician picks a component, takes guided photos and answers a few questions.
+- **Plant app:** a technician picks a component, takes guided photos and answers a few questions. They see a preliminary recommendation when it's ready and can call, text or message the company's contact.
 - **AI worker:** runs a fixed 7-stage diagnostic pipeline through the matching **playbook**, then drafts a diagnosis and a recommendation grounded in the tenant's approved catalog and rules.
-- **Engineer console:** an engineer reviews every request, approves or edits it, and sends a quote.
+- **Staff console:** requests arrive as **tickets**. An engineer reviews every ticket, approves or edits it, and can reason about it with a ticket chat copilot. Sales sends the quote and moves the status.
 - **Feedback loop:** approved cases and real-world outcomes become searchable examples that improve future recommendations.
 
 **MVP scope**
 - One tenant and one playbook, `wear_protection`. The source data is 11 product data sheets: 9 composite wear plates and 2 hardfacing welding wires, in `data/raw/wear_protection/`.
 - Plant app (PWA) and engineer console, with the full request lifecycle.
 - Quotes are a PDF with no pricing automation.
-- One agent: the engineer copilot (§12).
+- One agent: the ticket chat copilot for staff, with guardrails (§12).
 - An eval harness comparing the pipeline with a naive RAG baseline (§13).
 
 **Out of scope for the MVP:** a spare-parts playbook (needs machine data), WhatsApp intake, languages other than English, ERP or CRM integration, automated pricing and invoicing, and a native app.
@@ -31,13 +33,16 @@ This is the source of truth for what to build. `docs/PLAN.md` orders the work; `
 
 | Role | Where | Can do |
 |---|---|---|
-| `plant_user` | Plant app (phone) | Create requests for their plants, answer questions, view status and quotes, report outcomes |
-| `engineer` | Console (desktop) | View the tenant's queue, claim, review, message, quote, see component history |
-| `admin` | Console | Everything an engineer can, plus approve knowledge (products, rules, vocabulary), manage customers, plants and users |
+| `plant_user` | Plant app (phone) | Create requests for their plants, see the plant's request history, answer questions, see the preliminary and confirmed recommendation, call, text or message the contact, view quotes, report outcomes |
+| `engineer` | Console (desktop) | View the tenant's tickets, claim, review (approve, edit, reject the diagnosis and recommendations), chat with the copilot, message, see component history |
+| `sales` | Console | View tickets, chat with the copilot, message, quote and move the status to `quote_sent` or `closed`. Can't approve a diagnosis |
+| `admin` | Console | Everything an engineer and sales can, plus approve knowledge and proposals, manage customers, plants, users and invites |
 
-**Plant app screens:** Sign in (one-time code) · Home (components and open requests) · Pick component · Capture photos (guided: overview, close-up, coin for scale; instant blur and light checks) · Conditions (playbook questions) · Review and submit · Request status (timeline, messages, quote) · Follow-up ("how long has it lasted?").
+A profile holds a **set** of roles (`profiles.roles`); one person can be both `engineer` and `sales` (decision 0006).
 
-**Console screens:** Queue (priority, status, plant, age, confidence; claim) · Request detail (photos with evidence, ranked diagnosis with evidence, recommendations with reasons and data-sheet citations, check results, confidence, copilot draft; approve, edit, ask or reject) · Quote · Component history · Knowledge review (drafted records and rules awaiting approval, plus the ingestion issue list).
+**Plant app screens:** Join (invite link or plant code, then email one-time code; decision 0004) · Sign in (one-time code) · Home (the plant's components and request history, shared by everyone at the plant; an empty state when there is none) · Pick component · Capture photos (guided: overview, close-up, coin for scale; instant blur and light checks; unsent drafts kept on the device) · Conditions (playbook questions) · Review and submit · Request status (timeline, preliminary or confirmed recommendation, call / text / message the contact, quote) · Follow-up ("how long has it lasted?").
+
+**Console screens:** Tickets (priority, status, plant, age, confidence; claim) · Ticket detail, opened directly from the emailed link (photos with evidence, ranked diagnosis with evidence, recommendations with reasons and data-sheet citations, check results, confidence, ticket chat; approve, edit, ask or reject; quote and status for sales) · Quote · Component history · Knowledge review (drafted records, rules and proposals awaiting approval, plus the ingestion issue list) · Invites.
 
 ---
 
@@ -48,21 +53,23 @@ Plant app (Next.js PWA) ──presigned PUT──▶ R2 (photos)
         │ POST /v1/requests
         ▼
 FastAPI (Cloud Run) ──save + pgmq.send──▶ Supabase Postgres (requests, knowledge, pgvector, pgmq)
-        │ async POST /drain (fire-and-forget)                ▲         │ realtime
+        │ POST /drain kick (before responding)               ▲         │ realtime
         ▼                                                    │         ▼
 Worker (Cloud Run) ── 7-stage pipeline ── model gateway ──▶ paid model APIs
         │ writes analyses, status=ready_for_review           Engineer console (Next.js)
         ▼                                                         │
-Copilot (event: analysis_ready) ── MCP server (read-only tools) ──┘
+Ticket chat (staff) ── MCP server (read-only tools) ──────────────┘
 ```
 
 **Key decisions**
+- **Recommendations come from a scored diagnosis plus catalog rules, not from vector search** (decision 0002). Vector search finds similar past cases; the model only ranks candidates that pass the rules.
 - **Synchronous at the edge, message-driven behind it.** The API only validates, saves, enqueues and returns a request ID. It never calls a model.
 - **One worker runs all the stages as code,** with a checkpoint per stage. There's no function per stage and no Step Functions.
 - **The engineer's review is a status, not a running workflow.** Requests wait in `ready_for_review`.
 - **Postgres does three jobs:** the database, the vector store (pgvector) and the queue (pgmq).
-- **The worker can scale to zero.** It exposes `POST /drain`, which processes messages until the queue is empty or a time budget runs out. The API calls it after each enqueue without waiting. A scheduler pings `/drain` every 5 minutes to recover anything missed. For local development, `uv run poe worker` runs a polling loop.
-- **Events become consumers:** `analysis_ready` triggers the copilot; `request_closed` schedules the follow-up.
+- **The worker can scale to zero.** It exposes `POST /drain`, which processes messages until the queue is empty or a time budget runs out. The API sends the kick before it returns its own response (short timeout, errors ignored), because Cloud Run throttles CPU after a response. A scheduler pings `/drain` every minute to recover anything missed (decision 0009). For local development, `uv run poe worker` runs a polling loop.
+- **Events become consumers:** `analysis_ready` emails the ticket link to staff and makes the preliminary recommendation visible to the plant (§6); `request_closed` schedules the follow-up.
+- **Portable hosting:** every service is a Docker image and the queue sits behind a `Queue` interface (pgmq now, SQS later). Cloud Run for the MVP; AWS is decided at PLAN 7.3 (decision 0009).
 - **AWS equivalents for later:** SQS, ECS Fargate for the worker (the embedding model is too heavy for Lambda cold starts), Lambda for light handlers, and Step Functions only once quoting and invoicing add long multi-service workflows.
 
 ---
@@ -102,8 +109,10 @@ tenants(id, name)
 customers(id, tenant_id, name)                         -- the company that owns plants
 plants(id, tenant_id, customer_id, name, location)
 profiles(user_id uuid pk references auth.users, tenant_id, customer_id null,
-         role text check (role in ('plant_user','engineer','admin')),
-         plant_ids uuid[] default '{}', display_name)
+         roles text[] not null check (roles <@ array['plant_user','engineer','sales','admin']),
+         plant_ids uuid[] default '{}', display_name, phone text null)          -- phone: staff work number for call/text
+plant_invites(id, tenant_id, customer_id, code text unique, plant_ids uuid[], roles text[],
+              expires_at timestamptz, max_uses int, uses int default 0, created_by uuid)
 
 -- assets
 components(id, tenant_id, plant_id, playbook_id text, component_type text, name text,
@@ -117,9 +126,10 @@ playbooks(id text, tenant_id, version int, status text check (status in ('draft'
           primary key (tenant_id, id, version))
 vocab_terms(id, tenant_id, playbook_id text, kind text, code text, label text, description text,
             status text, version int, unique (tenant_id, playbook_id, kind, code, version))
-products(id, tenant_id, family text, name text, description text, applications text[],
+products(id, tenant_id, code text not null, family text, name text, description text, applications text[],
          attributes jsonb not null default '{}', source_doc text, status text, version int,
-         text_embedding vector(384), updated_at timestamptz)
+         text_embedding vector(384), updated_at timestamptz,
+         unique (tenant_id, code, version))                   -- code: stable identity across versions and DBs (0003)
 product_images(id, tenant_id, product_id, r2_key text, kind text check (kind in ('catalog','used','field')),
                image_embedding vector(512))
 rules(id, tenant_id, playbook_id text, kind text check (kind in ('remedy','check','compatibility')),
@@ -132,7 +142,7 @@ ingestion_issues(id, tenant_id, source_doc text, product_name text, field text, 
 requests(id, tenant_id, customer_id, plant_id, component_id, playbook_id text,
          status text not null default 'submitted', priority text default 'normal',
          answers jsonb default '{}', note text, created_by uuid, claimed_by uuid null,
-         updated_at timestamptz)
+         contact_user_id uuid null, attempt int not null default 0, updated_at timestamptz)
 request_photos(id, tenant_id, request_id, r2_key text, kind text check (kind in ('overview','closeup','nameplate','other')),
                client_quality jsonb, image_embedding vector(512))
 pipeline_runs(id, tenant_id, request_id, attempt int, stage text, status text,
@@ -150,13 +160,17 @@ outcomes(id, tenant_id, request_id, component_id, reported_life_days int null, r
 cases(id, tenant_id, request_id, playbook_id text, summary text, diagnosis jsonb, product_ids uuid[],
       verified bool default false, flagged bool default false,
       image_embedding vector(512), text_embedding vector(384))      -- case memory: created only from reviews
-copilot_drafts(id, tenant_id, request_id, body text, sources jsonb)
+chat_messages(id, tenant_id, request_id, author_id uuid null, role text check (role in ('user','assistant','tool')),
+              body text, sources jsonb, blocked bool default false)      -- ticket chat (§12); author null = assistant
+knowledge_proposals(id, tenant_id, request_id null, kind text check (kind in ('product_value','rule','weight','vocab')),
+                    target jsonb, change jsonb, rationale text, proposed_by text, status text default 'open',
+                    eval_report text null, decided_by uuid null, decided_at timestamptz null)
 events(id bigserial primary key, tenant_id, request_id uuid null, type text, payload jsonb, created_at)
 ```
 
 **Indexes:** HNSW indexes on every vector column; B-tree indexes on `(tenant_id, status)` for requests, `(tenant_id, family, status)` for products, and `(tenant_id, playbook_id, status)` for rules.
 
-**Queues (pgmq):** `requests` and `requests_dlq`.
+**Queues (pgmq):** `requests` and `requests_dlq`. Messages are typed: `{"type": "analyze", "request_id"}` and `{"type": "embed_case", "case_id"}` (decision 0010).
 
 **Later (spare-parts playbook):** `machines(id, tenant_id, plant_id, model, maker, attributes)`, `product_compatibility(product_id, machine_model, notes)`, `purchases(id, tenant_id, customer_id, plant_id, product_id, qty, purchased_on)`.
 
@@ -184,11 +198,15 @@ analyzing → failed  (after DLQ; an engineer can push it to ready_for_review ma
 | failed | ready_for_review | engineer |
 | ready_for_review | in_review | engineer (claim) |
 | in_review | ready_for_review | engineer (release) |
-| in_review | quote_sent | engineer |
-| in_review | closed | engineer |
-| quote_sent | closed | engineer or system |
+| in_review | quote_sent | sales (needs an approved or edited review) |
+| in_review | closed | engineer or sales |
+| quote_sent | closed | sales or system |
 
 The `in_review → ready_for_review` release is the only backward-looking move. It returns a claimed request to the queue, and it's allowed explicitly.
+
+**Mechanics** (decision 0013): a trigger blocks direct status updates; `transition_request()` sets a transaction-local flag the trigger checks, locks the row and verifies the from-state. `requests.attempt` increments on every entry into `analyzing`; a redelivered message resumes the same attempt. If the request is already `analyzing`, the worker skips the transition.
+
+**What the plant user sees** (decision 0005): once an analysis exists, the diagnosis and top-3 products are shown as **Preliminary, pending engineer confirmation**, and as **Confirmed** (the engineer's final version) after an approve or edit review. Products are **withheld** ("an engineer is reviewing this") when the analysis has `low_confidence`, `checks_failed` or `no_candidates`. The request shows call (`tel:`) and text (`sms:`) actions for `contact_user_id` (the tenant's on-call contact by default, then the claiming engineer) and in-app messages.
 
 ---
 
@@ -225,10 +243,10 @@ Only stages 2, 4 and 6 call a model. Code validates every model output before th
 - Output `Evidence`:
   - `features[]`: `code` (must be in `vocabulary.visual_features`), `location`, `severity` 1–3, `confidence` 0–1
   - `visible_text[]`
-  - `photo_quality`: `usable` and `issues[]`
+  - `photo_quality`: `usable`, `issues[]` and `missing_views[]` (e.g. `closeup`, `scale`)
   - `notes`
 - The stage also computes image embeddings (open_clip) for each photo and stores them in `request_photos.image_embedding`.
-- **Validation:** unknown feature codes are rejected and the stage retries once with the error. If `photo_quality.usable` is false, the request goes to `needs_info` with a retake request.
+- **Validation:** unknown feature codes are rejected and the stage retries once with the error. If `photo_quality.usable` is false or a required view is missing, the request goes to `needs_info` with a specific retake request (decision 0008).
 
 **Stage 3: Diagnosis (no model)**
 - For each mechanism `m`, the raw score is the sum of:
@@ -236,7 +254,7 @@ Only stages 2, 4 and 6 call a model. Code validates every model output before th
   - over answers: `scoring.answer_weights[q][a][m]`
   - `scoring.component_priors[component_type][m]`
   - `scoring.case_weight × similarity-weighted votes` from the k=5 nearest **approved** cases (image plus text embeddings; verified cases count double)
-- Normalize the raw scores to 0–1 by dividing by the maximum.
+- Normalize the raw scores to 0–1 by dividing by the maximum. Also record `evidence_mass` (the sum of raw scores before normalization), which feeds confidence so thin evidence can't look certain (decision 0002).
 - Output `Diagnosis`:
   - `ranked[]`: `mechanism`, `score`, `evidence_refs[]`
   - `margin`: the gap between the top two scores
@@ -245,7 +263,7 @@ Only stages 2, 4 and 6 call a model. Code validates every model output before th
 
 **Stage 4: Remedy (rules, then a model for ranking and wording)**
 - Evaluate the approved remedy rules against the diagnosis and answers. That yields `requirements` (hard filters on `attributes`), `preferences` (soft ordering), `thickness` and `installation`.
-- Query the approved products in the playbook's family that meet the requirements. If there are none, relax preferences only, never requirements. If there are still none, set the flag `no_candidates` and pass the request to Stage 6.
+- Load the approved products in the playbook's family and keep those that meet the requirements, evaluated in Python with the rule evaluator (decision 0002). If there are none, relax preferences only, never requirements. If there are still none, set the flag `no_candidates` and pass the request to Stage 6.
 - The model ranks up to 8 candidates down to a top 3. Each reason must cite attribute fields such as `wear_profile.abrasion` or `max_service_temp_c`.
 - Output `Recommendations`:
   - `items[]`: `product_id` (must be in the candidates), `rank`, `reason`, `cited_fields[]`
@@ -264,6 +282,7 @@ Only stages 2, 4 and 6 call a model. Code validates every model output before th
 **Stage 6: Confidence and explanation (model for the wording only)**
 - **Confidence** comes from `config/thresholds.yaml` weights over:
   - the diagnosis margin
+  - the evidence mass
   - mean evidence confidence
   - photo quality
   - the checks passing
@@ -282,23 +301,27 @@ Only stages 2, 4 and 6 call a model. Code validates every model output before th
 
 ## 8. API (FastAPI, `/v1`)
 
-Auth uses the Supabase JWT (verified against the project's JWKS). Role and tenant come from `profiles`.
+Auth uses the Supabase JWT (verified against the project's JWKS; the project uses asymmetric signing keys). Roles and tenant come from `profiles`. Every API transaction runs `SET LOCAL ROLE authenticated` with the verified claims, so RLS applies (decision 0012).
 
 | Method and path | Role | Purpose |
 |---|---|---|
 | `POST /uploads/presign` | plant_user | Returns presigned R2 PUT URLs and keys for N photos |
-| `POST /requests` | plant_user | Creates a request with `component_id`, `answers`, `note`, `photos[{key, kind, client_quality}]` and `priority`; enqueues it; kicks `/drain` |
+| `POST /requests` | plant_user | Creates a request with `component_id`, `answers`, `note`, `photos[{key, kind, client_quality}]` and `priority`; enqueues it; kicks `/drain` before responding |
 | `GET /requests` | all | Lists requests, filtered by role, with `status`, `plant_id` and `mine` filters |
-| `GET /requests/{id}` | all | Request, photos (signed GET URLs), analysis, messages, quote, timeline |
+| `GET /requests/{id}` | all | Request, photos (signed GET URLs), analysis (for plant users, filtered per §6), messages, quote, timeline, contact |
 | `POST /requests/{id}/answers` | plant_user | Answers or new photos for `needs_info`; re-enqueues |
 | `POST /requests/{id}/claim` / `release` | engineer | |
-| `POST /requests/{id}/review` | engineer | `decision`, `final_diagnosis`, `final_recommendations` and `notes`. On approve or edit, creates a `cases` row with embeddings |
+| `POST /requests/{id}/review` | engineer | `decision`, `final_diagnosis`, `final_recommendations` and `notes`. On approve or edit, creates a `cases` row and enqueues `embed_case`; the worker computes the embeddings (decision 0010) |
+| `GET/POST /requests/{id}/chat` | engineer, sales, admin | Ticket chat history; send a message to the copilot (§12) |
 | `POST /requests/{id}/messages` | all | |
-| `POST /requests/{id}/quote` | engineer | Items, then generates a PDF (ReportLab, pure Python, so it works the same on every OS), stores it in R2, transitions to `quote_sent` |
+| `POST /requests/{id}/quote` | sales | Items, then generates a PDF (ReportLab, pure Python, so it works the same on every OS), stores it in R2, transitions to `quote_sent` |
 | `POST /requests/{id}/outcome` | plant_user | Reported life and whether it resolved the problem. Marks the case `verified`, or `flagged` if it failed fast |
 | `GET/POST /components` | plant_user, admin | The plant's register |
 | `GET /knowledge/drafts` · `POST /knowledge/{type}/{id}/approve` · `POST .../reject` | admin | Products, rules, vocabulary, playbooks |
 | `GET /knowledge/issues` · `POST /knowledge/issues/{id}/resolve` | admin | Ingestion issue list |
+| `GET /knowledge/proposals` · `POST /knowledge/proposals` · `POST .../{id}/approve` · `.../reject` | engineer (create), admin (decide) | Knowledge change proposals; approval needs an attached eval report (§11) |
+| `POST /invites` · `GET /invites` | admin | Create and list plant invites |
+| `POST /invites/redeem` | signed-in user without a profile | Redeem an invite code; creates the profile bound to its plants |
 | `GET /health` | none | |
 
 ---
@@ -313,6 +336,7 @@ Auth uses the Supabase JWT (verified against the project's JWKS). Role and tenan
   - If `read_ct > 3`, send it to `requests_dlq`, archive the original and transition the request to `failed`.
 - `/drain` is authenticated with a shared secret header and has a time budget of about 8 minutes.
 - **Resume:** before each stage, check `pipeline_runs` for a successful row with the same `input_hash` and reuse its output.
+- **Message types:** `analyze` runs the pipeline; `embed_case` computes a case's embeddings (image: mean of the request's photo embeddings; text: the case summary).
 
 ---
 
@@ -351,7 +375,7 @@ Auth uses the Supabase JWT (verified against the project's JWKS). Role and tenan
 
 - **Automatic, gated by engineer approval:** an approved or edited review creates a `cases` row with diagnosis, products and embeddings. Unreviewed AI output never enters case memory.
 - **Outcomes:** a resolved outcome marks the case `verified`, which gets double weight in Stage 3. Failing fast (life below the playbook's threshold) marks it `flagged` and opens a rule-review item.
-- **Reviewed changes:** rule or weight changes come from proposals (later, the quality agent) and from engineer edits. They must pass `uv run poe eval` with no increase in the confident-but-wrong rate before an admin approves them. Everything is versioned and can be rolled back.
+- **Reviewed changes:** rule, weight, vocabulary and product-value changes are written as `knowledge_proposals`, by engineers, by the ticket chat, and later by the quality agent. The chat never changes knowledge directly (decision 0007). They must pass `uv run poe eval` with no increase in the confident-but-wrong rate before an admin approves them. Everything is versioned and can be rolled back.
 - **Isolation:** case memory is per tenant. There's no cross-tenant retrieval.
 
 ---
@@ -366,13 +390,18 @@ Auth uses the Supabase JWT (verified against the project's JWKS). Role and tenan
 - `find_similar_cases(request_id, k)`
 - `get_rules(playbook_id, mechanism?)`
 - `get_analysis(request_id)`
-- `save_copilot_draft(request_id, body, sources)`: writes `copilot_drafts` only
+- `propose_knowledge_change(request_id, kind, target, change, rationale)`: writes `knowledge_proposals` only, with status `open`
 
-**Engineer copilot (MVP)**
-- Triggered by `analysis_ready`.
-- Uses the MCP tools, with a cap of 8 tool calls and a cost limit.
-- Writes a draft covering: similar past cases, the component's history, and a suggested note to the technician or a clarifying question.
-- It only drafts; it never sends.
+**Ticket chat copilot (MVP; decision 0007)**
+- A chat on each ticket for staff (engineer, sales, admin), stored in `chat_messages`. Each turn is loaded with the ticket context: request, photos' evidence, analysis, checks and the component's history.
+- Uses the MCP tools only, with a cap of 8 tool calls and a cost limit per message.
+- Can explain and challenge the recommendation, find similar cases, draft a note to the technician, and write a knowledge proposal. It never sends anything to a customer and never changes knowledge directly.
+- **Guardrails, in layers:**
+  1. A cheap topic classifier rejects messages that aren't about this ticket, the products, the plant or wear; the turn is stored with `blocked = true` and a fixed reply.
+  2. A ticket-scoped system prompt. Photos, documents, messages and tool results are data, never instructions.
+  3. Read-only, tenant-scoped tools; `propose_knowledge_change` is the only write.
+  4. Code validates the answer: every product ID or code it mentions must exist and be approved, and every citation must resolve.
+  5. Caps on tool calls and cost per message; everything traced in Langfuse.
 
 **Later agents:** catalog ingestion as an interactive agent, triage (urgency, routing, duplicates), follow-up scheduling, weekly insights, and the quality agent (nightly eval plus rule proposals). They all start in "draft" mode.
 
@@ -390,18 +419,19 @@ Auth uses the Supabase JWT (verified against the project's JWKS). Role and tenan
 
 ```yaml
 id: wp-0001
-photos: [evals/wear_protection/photos/wp-0001-a.jpg]
+photos: [assets/eval-photos/wp-0001-a.jpg]
 component_type: chute
 answers: {material_handled: clinker, temperature: ambient, wet_or_dry: dry, particle_size: lumps, impact: high, life_of_current_days: 60}
 expected:
   mechanisms_top2: [abrasion, impact]        # either order
-  acceptable_products: ["<product name or id>"]
+  acceptable_products: ["<product code>"]   # products.code (decision 0003)
   must_not_recommend: []
 source: own_photo | client_case | synthetic_ui_only
 ```
 
 **Sources:**
-- Your own photos of worn parts, with answers you know.
+- Your own photos of worn parts, with answers you know. These are committed under `assets/eval-photos/` (JPEG, long side ≤ 1600 px), so CI can run the eval (decision 0011).
+- Client photos stay in `evals/photos/private/` (gitignored); their cases run locally only.
 - Client site reports and case studies, once received.
 - Synthetic images are never used for accuracy.
 
@@ -422,7 +452,7 @@ source: own_photo | client_case | synthetic_ui_only
 
 ## 14. Frontend
 
-- **One Next.js app,** built as a static export, with route groups `(plant)` and `(console)` and role-based redirects after sign-in.
+- **One Next.js app,** built as a static export, with route groups `(plant)` and `(console)` and role-based redirects after sign-in. Detail pages use query strings (`/console/request?id=…`), because a static export can't have unknown dynamic segments (decision 0014).
 - **Plant app:**
   - Phone-first PWA (manifest and service worker) with large touch targets.
   - Camera capture through `<input type="file" accept="image/*" capture="environment">` plus client-side checks on a canvas.
@@ -430,8 +460,9 @@ source: own_photo | client_case | synthetic_ui_only
   - Questions rendered from the playbook's `questions` (fetched from the API), so a new playbook needs no UI code.
 - **Console:**
   - The queue updates live through Supabase Realtime on `requests`.
-  - Request detail shows photos with evidence locations, the ranked diagnosis, recommendations with cited fields, check results, confidence, flags, the copilot draft and actions.
-- **Figma:** once the Figma MCP server is connected, pull frames with `get_design_context` and `get_screenshot`, map them to components, and match the spacing and type. Until designs exist, build with shadcn/ui following the screen list in §2.
+  - Ticket detail shows photos with evidence locations, the ranked diagnosis, recommendations with cited fields, check results, confidence, flags, the ticket chat and actions.
+- **Plant request status** shows the preliminary or confirmed recommendation per §6, with call, text and message actions.
+- **Figma first** (decision 0016): every screen is designed in Figma before it's built; colours, type and spacing become Tailwind theme tokens. Once the Figma MCP server is connected, pull frames with `get_design_context` and `get_screenshot`, map them to components, and match the spacing and type. Until designs exist, build with shadcn/ui following the screen list in §2.
 - **Testing:**
   - Playwright e2e runs on Chromium and WebKit, with phone viewports for `/plant` and desktop for `/console`. It runs against the local stack with `MODEL_PROVIDER=replay`, so results are identical on every machine.
   - Real-device checks: Safari (Mac), Edge (PC), and a real phone over an HTTPS tunnel (`uv run poe phone`), because camera capture and the service worker need HTTPS.
@@ -441,7 +472,8 @@ source: own_photo | client_case | synthetic_ui_only
 
 ## 15. Security and privacy
 
-- RLS on every table, keyed on `tenant_id` and the role and plants from `profiles`. The API uses the service role only inside the worker and MCP, always with an explicit tenant filter.
+- RLS on every table, keyed on `tenant_id` and the roles and plants from `profiles`. The API runs under RLS (`SET LOCAL ROLE authenticated`); only the worker and MCP use the service role, always with an explicit tenant filter.
+- The ticket chat's guardrails are in §12.
 - Photos are private in R2. Access goes through short-lived signed URLs.
 - Client documents and photos go only to paid model endpoints that don't train on the data. No free-tier APIs with real data.
 - The audit trail lives in `events`, `pipeline_runs`, `reviews` and `analyses.versions`.
@@ -454,10 +486,11 @@ source: own_photo | client_case | synthetic_ui_only
 | Layer | MVP (free tier) | Later |
 |---|---|---|
 | Web | Next.js static export on Cloudflare Pages (Vercel's free plan is non-commercial) | Paid hosting |
-| API, worker, MCP | Docker containers on Google Cloud Run (scale to zero) | Paid Cloud Run or ECS Fargate |
+| API, worker, MCP | Docker containers on Google Cloud Run (scale to zero) | Paid Cloud Run, or AWS (Lambda + SQS, or ECS Fargate), decided at 7.3 (decision 0009) |
 | Database, auth, realtime, vectors, queue | Supabase free (the project pauses after 7 days idle) | Supabase Pro |
 | Photos | Cloudflare R2 free (no egress fees) | Paid R2 |
-| Scheduler | Cloud Scheduler hitting `/drain` every 5 minutes | Same |
+| Scheduler | Cloud Scheduler hitting `/drain` every minute | Same |
+| Email (sign-in codes, ticket links) | Supabase's built-in email in dev; Resend free tier before the pilot | Paid |
 | Models | Paid API through the gateway | Volume pricing, own models |
 | Tracing and errors | Langfuse and Sentry free tiers | Paid or self-hosted |
 | CI | GitHub Actions: Ubuntu on every push; Windows and macOS weekly | Same |
@@ -469,6 +502,7 @@ source: own_photo | client_case | synthetic_ui_only
 - Models: `MODEL_PROVIDER` (`replay` for tests), `MODEL_API_KEY`
 - Tracing and errors: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `SENTRY_DSN`
 - Services: `API_PORT`, `WORKER_PORT`, `MCP_PORT`, `WORKER_URL`, `WORKER_DRAIN_SECRET`, `MCP_SERVICE_TOKEN`, `CORS_ALLOWED_ORIGINS`
+- Email and links: `EMAIL_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL`
 - Optional tools: `SOFFICE_PATH`
 - Frontend: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
@@ -482,7 +516,7 @@ source: own_photo | client_case | synthetic_ui_only
 | CI | Ubuntu (every push); Windows and macOS (weekly) | Local Supabase on Ubuntu | Gate for merges to `main`; portability check |
 | Production | Linux x86_64 containers (Cloud Run) | Hosted prod project | Live |
 
-- **Code must run on all of these** (CLAUDE.md invariant 13).
+- **Code must run on all of these** (CLAUDE.md invariant 15).
 - **Container images** are built only in CI, for `linux/amd64`.
 - **Client documents** sync between machines through the private R2 prefix (`poe raw-pull` / `raw-push`), never through git.
 

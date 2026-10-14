@@ -1,6 +1,8 @@
 # CLAUDE.md: Plant Advisor
 
-A plant technician photographs a worn or failed component and answers a few questions. An AI worker diagnoses the problem through a **product-family playbook** and drafts a grounded recommendation. An engineer reviews **every** request before a quote goes out.
+A plant technician photographs a worn or failed component and answers a few questions. An AI worker diagnoses the problem through a **product-family playbook** and drafts a grounded recommendation, which the technician sees as *preliminary*. Staff see it as a ticket with a guarded chat copilot. An engineer reviews **every** request before sales sends a quote.
+
+Design decisions live in `docs/decisions/`; read the ones relevant to your task. Precision and consistency come before speed.
 
 - Full spec: `docs/SPEC.md`. Build plan: `docs/PLAN.md`.
 - Machine setup and testing: `docs/DEV_SETUP.md`. Session state: `docs/PROGRESS.md`.
@@ -19,8 +21,8 @@ Development happens on a **Mac** and a **Windows PC (inside WSL2 Ubuntu)**, and 
 
 - **Python 3.12** (`.python-version`), managed with **uv** (one universal `uv.lock`). Lint and format with **ruff**; types with **pyright** (strict in `packages/core`).
 - **Task runner:** **poethepoet**, defined in the root `pyproject.toml` and run as `uv run poe <task>`. It runs the same on macOS, Linux and Windows. Tasks load `.env` automatically.
-- **Node 22** (`.node-version`) with **pnpm**, pinned through `packageManager` in the root `package.json`. The Supabase CLI is a dev dependency (`pnpm exec supabase …`), so both machines run the same version.
-- **Backend:** FastAPI (`services/api`), worker (`services/worker`), MCP server (`services/mcp`, Python MCP SDK). Shared library: `packages/core`. Docker images for Cloud Run are built in CI for `linux/amd64`.
+- **Node 22** (`.node-version`, `.nvmrc`) with **pnpm**, pinned through `packageManager` in the root `package.json`. The Supabase CLI is a dev dependency (`pnpm exec supabase …`), so both machines run the same version.
+- **Backend:** FastAPI (`services/api`), worker (`services/worker`), MCP server (`services/mcp`, Python MCP SDK). Shared library: `packages/core`. Docker images are built in CI for `linux/amd64`; Cloud Run for the MVP, AWS possible later (decision 0009), so keep services portable.
 - **Database:** Supabase Postgres with **pgvector** (embeddings) and **pgmq** (queue). Migrations live in `supabase/migrations` (Supabase CLI). Access from Python with psycopg 3 (`psycopg[binary]`). Daily development uses the shared hosted **dev** project. Integration tests use a **local** Supabase in Docker.
 - **Storage:** Cloudflare R2 through its S3-compatible API (boto3). The browser uploads directly with presigned URLs.
 - **Models:** all calls go through `packages/core/models/gateway.py`. Model IDs and prompt versions live in `config/models.yaml` and `prompts/`. `MODEL_PROVIDER=replay` serves recorded responses.
@@ -45,6 +47,7 @@ config/                   models.yaml, thresholds.yaml
 supabase/                 config.toml, migrations/, seed/ (demo tenants, plants, components)
 ingestion/                data-sheet ingestion: parsers, extraction prompts, validators
 evals/                    test cases, baseline (naive RAG), harness, recordings/, reports/
+assets/eval-photos/       the owner's own photos of worn parts (committed; not client data)
 scripts/                  cross-platform Python helpers behind poe tasks (doctor, dev, phone, raw sync)
 data/raw/                 client source documents. GITIGNORED: never commit (synced via R2)
 docs/                     SPEC.md, PLAN.md, DEV_SETUP.md, PROGRESS.md, decisions/
@@ -87,7 +90,9 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 10. **Never invent metrics.** Report accuracy, calibration, latency or cost in README or reports only after measuring it with `uv run poe eval`.
 11. **All times are stored in UTC** (timestamptz) and converted in the UI.
 12. **Raw client documents never enter git.** `data/raw/`, `evals/photos/private/` and `ingestion/reports/` are gitignored and sync through R2. Fixtures use synthetic or user-approved samples.
-13. **Everything runs on macOS, Linux and Windows.** Follow `docs/DEV_SETUP.md` §8:
+13. **Plant users never see products from a weak analysis.** Products are withheld when the analysis has `low_confidence`, `checks_failed` or `no_candidates`; otherwise they're labelled preliminary until an engineer approves (SPEC §6).
+14. **The chat never changes knowledge.** The ticket copilot is read-only except for writing `knowledge_proposals`; off-topic messages are blocked (SPEC §12).
+15. **Everything runs on macOS, Linux and Windows.** Follow `docs/DEV_SETUP.md` §8:
     - Paths and files: `pathlib`, `tempfile`, explicit `encoding="utf-8"`, LF endings, no case-only filename differences.
     - Processes: subprocess with argument lists and no `shell=True`; find external tools with `shutil.which` or an env var.
     - Tasks: poe tasks use `cmd`, `script` or `sequence`, never `shell`; helpers are Python under `scripts/`; options are flags, not inline env vars.
