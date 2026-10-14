@@ -234,7 +234,7 @@ We still build plain RAG as a **baseline** and measure both, so "ours is better"
 ## 0020: How library updates are allowed in
 *Technical note: [0020](../decisions/0020-dependency-update-policy.md)*
 
-**Decision:** a new version of any library must be **at least 14 days old** before we use it, and **major versions** (like TypeScript 5 → 7) are never updated automatically. They become a planned board story instead.
+**Decision:** a new version of any library, Python or Node, must be **at least 14 days old** before we use it, and **major versions** (like TypeScript 5 → 7) are never updated automatically. They become a planned board story instead.
 
 **Why:** Dependabot's first big update tried to jump several tools a whole major version, using releases only days old. CI stopped it, but we don't want safety to depend on luck. Very new releases are where broken or even malicious versions show up, and major versions can quietly change behaviour.
 
@@ -245,3 +245,20 @@ We still build plain RAG as a **baseline** and measure both, so "ours is better"
 | Turn off automatic updates | No noise | We'd miss security fixes |
 
 Urgent **security** fixes skip the waiting period, so they still arrive quickly.
+
+---
+
+## 0021: The storage key can't change storage settings; client files sync safely
+*Technical note: [0021](../decisions/0021-r2-least-privilege-and-raw-sync.md)*
+
+**Decision:**
+- **Least privilege:** the key our app uses for photo storage (R2) can only read and write files. It can't change the bucket's settings, so even a leaked key couldn't open the bucket up.
+- **Browser upload permission (CORS)** is pasted into the Cloudflare dashboard once, and `uv run poe r2-cors` tests it the way a browser would: our sites are allowed, other sites are refused.
+- **Client documents move between machines** with `uv run poe raw-push` and `raw-pull`. Matching files are skipped. If a file differs between machines, it's flagged and left alone until you decide. Nothing is ever deleted unless you explicitly ask.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **Limited key + paste once + browser-style test (chosen)** | A leaked key can do little; the test checks what really matters | One manual paste per bucket |
+| A powerful key so scripts can change settings | Fully automated | Far more damage if the key leaks |
+| Sync like a shared drive ("last save wins") | Simple | Silently loses one copy when two differ |
+| Put client files in git | One tool | Client data would end up on GitHub, which is forbidden |

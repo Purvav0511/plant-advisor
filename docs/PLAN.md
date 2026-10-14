@@ -79,7 +79,7 @@ Done when: `uv run poe db-up && uv run poe migrate --local` succeeds.
 
 **0.5 👤 Shared dev environment**
 - Apply the migrations to the hosted dev project with `uv run poe migrate`, using the Session pooler URL.
-- Set the R2 dev bucket's CORS for `http://localhost:3000` and the tunnel origins.
+- Set the R2 dev bucket's CORS for `http://localhost:3000` and the tunnel origins: rules in `config/r2-cors.json`, pasted into the dashboard (the app's token can't change bucket settings), verified with `uv run poe r2-cors` (decision 0021).
 - Add `scripts/raw_sync.py` behind `poe raw-push` and `poe raw-pull`. It syncs `data/raw/`, `evals/photos/private/` and `ingestion/reports/` with the private `R2_RAW_PREFIX`, compares checksums, and never deletes on the remote without a `--prune` flag.
 
 Done when: `raw-push` from the first machine and `raw-pull` on the second give identical files.

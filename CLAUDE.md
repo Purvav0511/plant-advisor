@@ -80,7 +80,8 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 - **`eval-report`:** write `evals/reports/<date>.md`.
 - **`e2e`:** Playwright end-to-end tests against the local stack with `MODEL_PROVIDER=replay`.
 - **`phone`:** HTTPS tunnels (cloudflared) to the web app and the API for testing on a real phone.
-- **`raw-pull` / `raw-push`:** sync `data/raw/`, `evals/photos/private/` and `ingestion/reports/` with the private R2 prefix.
+- **`raw-pull` / `raw-push`:** sync `data/raw/`, `evals/photos/private/` and `ingestion/reports/` with the private R2 prefix. Checksums; conflicts are skipped unless `--overwrite`; remote deletes only with `--prune`; `--dry-run` previews (decision 0021).
+- **`r2-cors`:** check the R2 bucket's CORS the way a browser does; `--rules` prints `config/r2-cors.json` to paste into the dashboard.
 
 ## Invariants: never break these
 
