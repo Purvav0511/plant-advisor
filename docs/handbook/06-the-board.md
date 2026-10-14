@@ -2,6 +2,8 @@
 
 We track work on a free **GitHub Project** linked to the repo, which works like a lightweight Jira.
 
+**Open it:** https://github.com/users/Purvav0511/projects/3 (or the repo's *Projects* tab, or the GitHub mobile app).
+
 ## How the work is organized
 
 | Jira term | Here | Example |

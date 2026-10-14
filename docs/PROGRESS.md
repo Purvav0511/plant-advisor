@@ -8,21 +8,25 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/0.3-ci` (PR open against `dev`)
-- **PLAN task:** 0.3 CI, branch model and guards (story #7; in review: CI green, waiting for the owner to read and merge PR #3, then check the `guard` run on `dev`).
-- **Board:** stories are GitHub issues (epics #4, #11, #21, #25, #37, #48, #60, #65). The GitHub Project board is pending the `project` token scope.
+- **Branch:** `task/0.4-local-supabase` (PR into `dev`)
+- **PLAN task:** 0.4 Local Supabase for integration tests (story #8)
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Next step:** finish 0.3's "Done when", then PLAN 0.4 (local Supabase for integration tests).
-- **Blockers / waiting on (from the client):**
-  - the five-level wear scale for 9 products
-  - missing composition values
-  - the corrected carbon range for one wire
-  - the missing product description (SPEC §18)
-- **Waiting on the owner:** Supabase dev project (asymmetric JWT keys) and R2 bucket before PLAN 0.5. No paid plans until after the MVP (decision 0019 says when to switch).
-- **Last check:** `uv run poe check` green (42 tests); `uv run poe doctor` 0 failed, 2 warnings (empty env values, no database yet) on pc-wsl.
-- **On the other machine (Mac):** not set up yet. After cloning, run `uv run pre-commit install` (it now installs the pre-push hook too).
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1: 0.1, 0.4, 0.5, 0.6).
+- **Next step:** owner reads and merges the 0.4 PR; then PLAN 0.5 once the owner's Supabase dev project and R2 bucket exist and `.env` is filled in.
+- **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73).
+- **Waiting on the owner:** Supabase dev project and R2 bucket (instructions given 2026-10-14); fill `.env`; then `uv run poe doctor` should show the database reachable.
+- **Open Dependabot PRs:** #74 (actions), #75 (node packages). Review after 0.4.
+- **On the other machine (Mac):** not set up yet.
 
 ## Log
+
+### 2026-10-14 · pc-wsl · 0.4
+- **Changed:** `supabase/` (`supabase init`; seeding off until 1.4) and the first migration enabling `vector` and `pgmq`.
+- **Changed:** `scripts/db.py` behind `poe db-up` (starts only Postgres, auth and the gateway), `db-down`, `migrate [--local]` (remote refuses if the branch is behind GitHub), `test-int` (resets the **local** DB only, then runs tests marked `integration`).
+- **Changed:** integration tests in `packages/core/tests/integration/` (migrations match the repo, pgvector distance, pgmq round trip). CI's integration job now switches on.
+- **Also:** board created (GitHub Project 3) with Status, Cycle, and Backlog/Board/Roadmap views; handbook links it.
+- **Next:** PLAN 0.5 after the owner's accounts exist.
+- **On the other machine:** Docker must be running for `poe db-up`; first start downloads the Supabase images (a few minutes).
 
 ### 2026-10-13 · pc-wsl · 0.3
 - **Changed:** `dev` branch created and made the default; branch model and free stand-ins for branch protection: `scripts/branch_rules.py`, `guard_branch.py` (pre-commit and pre-push hooks), `merge.py` (`poe merge`), `verify_push.py` (`guard` workflow).
