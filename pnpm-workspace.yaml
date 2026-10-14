@@ -1,6 +1,10 @@
 packages:
   - apps/*
 
+# Don't install any package version released less than 14 days ago (in minutes), matching
+# Dependabot's cooldown. Very new releases are where broken or malicious versions show up.
+minimumReleaseAge: 20160
+
 # pnpm only runs install scripts for packages listed here.
 allowBuilds:
   # The Supabase CLI downloads its binary in postinstall.

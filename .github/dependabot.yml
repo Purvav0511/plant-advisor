@@ -1,28 +1,57 @@
-# Dependency update PRs target dev (decision 0019) and are grouped to keep the noise down.
+# Dependency update PRs (decision 0019; policy in docs/handbook/04-how-we-build-and-ship.md).
+# - Target `dev`, grouped to keep the noise down.
+# - Wait 14 days after a release before proposing it (`cooldown`), like every pinned version here.
+# - Minor and patch updates only. A major version can change behaviour, so it's planned as
+#   a board story and done by hand, never proposed automatically.
 version: 2
+
 updates:
   - package-ecosystem: uv
     directory: /
     target-branch: dev
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       python:
         patterns: ["*"]
+
   - package-ecosystem: npm
     directory: /
     target-branch: dev
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 14 }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Type definitions must match the Node we run (22, .node-version), not the newest Node.
+      - dependency-name: "@types/node"
+        versions: [">=23"]
     groups:
       node:
         patterns: ["*"]
+
   - package-ecosystem: github-actions
     directories: ["/", "/.github/actions/*"]
     target-branch: dev
     schedule: { interval: monthly }
+    cooldown: { default-days: 14 }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       actions:
         patterns: ["*"]
+
   - package-ecosystem: docker
     directory: /docker
     target-branch: dev
     schedule: { interval: monthly }
+    cooldown: { default-days: 14 }
+    ignore:
+      # The image's Python must stay on 3.12 (.python-version). Docker tags aren't SemVer,
+      # so 3.12 -> 3.13 would otherwise look like a minor update.
+      - dependency-name: python
+        versions: [">=3.13"]

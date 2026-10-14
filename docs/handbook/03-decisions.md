@@ -228,3 +228,20 @@ We still build plain RAG as a **baseline** and measure both, so "ours is better"
 | Pay for GitHub Pro now | Real enforcement | About $4/month; deferred until after the MVP |
 
 **When we start paying:** when a second developer joins, or before real plant users use a shared environment (the pilot).
+
+---
+
+## 0020: How library updates are allowed in
+*Technical note: [0020](../decisions/0020-dependency-update-policy.md)*
+
+**Decision:** a new version of any library must be **at least 14 days old** before we use it, and **major versions** (like TypeScript 5 → 7) are never updated automatically. They become a planned board story instead.
+
+**Why:** Dependabot's first big update tried to jump several tools a whole major version, using releases only days old. CI stopped it, but we don't want safety to depend on luck. Very new releases are where broken or even malicious versions show up, and major versions can quietly change behaviour.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **14-day wait, no automatic majors (chosen)** | Avoids fresh broken releases; big changes are deliberate | Updates arrive two weeks later |
+| Accept anything that passes CI | Always up to date | CI can't catch every behaviour change |
+| Turn off automatic updates | No noise | We'd miss security fixes |
+
+Urgent **security** fixes skip the waiting period, so they still arrive quickly.
