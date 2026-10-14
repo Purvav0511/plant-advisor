@@ -7,6 +7,6 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "supabase": "2.118.0"
+    "supabase": "2.119.0"
   }
 }
