@@ -11,3 +11,5 @@
 **Why:** brand-new releases are where broken and malicious versions appear; majors change behaviour and deserve a deliberate decision.
 
 **Alternatives:** accept everything CI passes (CI can't catch behaviour changes it doesn't test); turn Dependabot off (we'd miss security fixes); shorter cooldowns (less protection; 14 days matches our pinning rule). Security advisories aren't subject to the cooldown, so urgent fixes still arrive.
+
+**Update (2026-10-14, PLAN 0.5):** Python follows the same rule: `[tool.uv] exclude-newer = "14 days"` in `pyproject.toml`. Re-locking under it stepped 31 packages back to their previous release (e.g. mcp 2.3.0 → 2.2.0, fastapi 0.143 → 0.142.2); PyTorch was unchanged, and every check passed. `uv lock --check` stays valid with the rolling window.

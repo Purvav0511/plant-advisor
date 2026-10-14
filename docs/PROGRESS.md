@@ -8,16 +8,24 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `fix/dependabot-policy` (PR into `dev`, closes #77)
-- **PLAN task:** 0.4 done (merged #76). This is maintenance outside PLAN: the dependency update policy (decision 0020).
+- **Branch:** `task/0.5-shared-dev` (PR into `dev`, closes #9)
+- **PLAN task:** 0.5 Shared dev environment (in review). Done here: migration applied to the shared dev DB (doctor: no drift); `raw-push`/`raw-pull` built and tested through the real bucket; CORS rules written and checker built. **Waiting on the owner:** paste the CORS rules in the dashboard, then `uv run poe r2-cors` should pass. The cross-machine "Done when" is completed with the Mac at 0.6.
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.5, 0.6). Auto-add is on.
-- **Next step:** owner reads and merges this PR; close Dependabot PRs #74 and #75 so they return under the new rules; then PLAN 0.5 (from `dev`: `uv run poe migrate`, R2 CORS, `raw-push`/`raw-pull`).
-- **Shared dev database:** reachable from pc-wsl; migration `20261014020917` not applied yet (first step of 0.5).
-- **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73).
-- **On the other machine (Mac):** not set up yet. Its `.env` comes from the password manager (Supabase and R2 values now exist).
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.5 in review, 0.6).
+- **Next step:** owner reads, tests and merges this PR; then PLAN 0.6 (Mac setup), or Phase 1 (1.1 core schema) on this PC.
+- **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73). The 11 data sheets aren't in `data/raw/wear_protection/` yet; put them there and `uv run poe raw-push` when available (needed by 1.7).
+- **On the other machine (Mac):** not set up yet. `.env` from the password manager, including the two new secrets.
 
 ## Log
+
+### 2026-10-14 · pc-wsl · 0.5
+- **Changed:** the shared dev database got migration `20261014020917` (vector 0.8.2, pgmq 1.5.1, same as local); `WORKER_DRAIN_SECRET` and `MCP_SERVICE_TOKEN` generated into `.env` (never printed).
+- **Changed:** `scripts/raw_sync.py` (`poe raw-push` / `raw-pull`: checksums, conflicts skipped unless `--overwrite`, remote deletes only with `--prune`, `--dry-run`, unsafe keys refused) and `scripts/r2.py` (R2 store with verified downloads; `poe r2-cors` checks CORS by browser-style preflight); `config/r2-cors.json`.
+- **Changed:** `[tool.uv] exclude-newer = "14 days"` (Python follows decision 0020; 31 packages stepped back a release; all checks pass); `boto3` added to the dev tools.
+- **Verified for real:** push, identical re-push skipped, pull into an empty folder byte-identical, a real conflict refused; test file removed from R2 afterwards.
+- **Decisions:** [0021](decisions/0021-r2-least-privilege-and-raw-sync.md) R2 least privilege, CORS and raw sync; 0020 extended to Python.
+- **Next:** owner pastes CORS rules (`uv run poe r2-cors --rules`), then `uv run poe r2-cors` passes.
+- **On the other machine:** `git pull`, `uv sync` (Python lock changed), `pnpm install`; copy `WORKER_DRAIN_SECRET` and `MCP_SERVICE_TOKEN` from the password manager into `.env`; then `uv run poe raw-pull` and compare with this PC (0.6).
 
 ### 2026-10-14 · pc-wsl · maintenance (#77)
 - **Changed:** `.github/dependabot.yml` (14-day cooldown, no automatic majors, `@types/node` < 23, Docker Python < 3.13); `pnpm-workspace.yaml` `minimumReleaseAge: 20160`; `apps/web` `@types/node` ^20 → ^22; `pnpm-lock.yaml` re-resolved under the rule.

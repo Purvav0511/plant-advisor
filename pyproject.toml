@@ -23,10 +23,13 @@ dev = [
     "httpx",
     "pre-commit",
     "psycopg[binary]",
+    "boto3>=1.43.106",
 ]
 
 [tool.uv]
 package = false
+# Only package versions uploaded at least 14 days ago (decision 0020); pnpm has the same rule.
+exclude-newer = "14 days"
 
 [tool.uv.workspace]
 members = ["packages/core", "services/*", "ingestion", "evals"]
@@ -150,13 +153,17 @@ cmd = "python -m scripts.not_yet e2e 5.10"
 help = "HTTPS tunnels for testing on a real phone (PLAN 5.10)"
 cmd = "python -m scripts.not_yet phone 5.10"
 
+[tool.poe.tasks.r2-cors]
+help = "Check the R2 bucket's CORS like a browser would; --rules prints the rules to paste"
+cmd = "python -m scripts.r2"
+
 [tool.poe.tasks.raw-pull]
-help = "Pull client documents and private photos from R2 (PLAN 0.5)"
-cmd = "python -m scripts.not_yet raw-pull 0.5"
+help = "Pull client documents and private photos from R2 (--dry-run, --overwrite)"
+cmd = "python -m scripts.raw_sync pull"
 
 [tool.poe.tasks.raw-push]
-help = "Push client documents and private photos to R2 (PLAN 0.5)"
-cmd = "python -m scripts.not_yet raw-push 0.5"
+help = "Push client documents and private photos to R2 (--dry-run, --overwrite, --prune)"
+cmd = "python -m scripts.raw_sync push"
 
 # ---------------------------------------------------------------------------
 # Tool configs

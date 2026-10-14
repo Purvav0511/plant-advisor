@@ -57,6 +57,18 @@ hotfix/urgent-fix ──PR──▶ main, then main ──PR──▶ dev
 | Dependabot | GitHub | Opens PRs to update libraries, so security fixes arrive |
 | Weekly audit | GitHub | Reports known vulnerabilities in our libraries |
 
+## Client documents and private photos
+
+They never go into git. They travel between your machines through a private folder in the R2 bucket:
+
+| Command | What it does |
+|---|---|
+| `uv run poe raw-push` | Uploads new files from `data/raw/`, `evals/photos/private/` and `ingestion/reports/` |
+| `uv run poe raw-pull` | Downloads files that are missing here |
+| add `--dry-run` | Shows what would happen; changes nothing |
+
+Identical files are skipped. A file that differs between machines is flagged as a **conflict** and left alone until you decide (`--overwrite` replaces it). Nothing is deleted unless you ask (`--prune` on push). See [decision 0021](03-decisions.md#0021-the-storage-key-cant-change-storage-settings-client-files-sync-safely).
+
 ## Library updates
 
 Dependabot opens update PRs into `dev`, grouped by type (Python, Node, GitHub Actions, Docker). The rules ([decision 0020](03-decisions.md#0020-how-library-updates-are-allowed-in)):

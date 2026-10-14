@@ -46,7 +46,7 @@ This page covers setting up both machines, moving work between them with Claude,
 - A **private** GitHub repository. Install the Claude GitHub App on it if you want cloud sessions (§6).
 - A Claude plan that includes Claude Code (Pro or Max), signed in on both machines with the **same account**.
 - **Supabase:** one hosted **dev** project, shared by both machines. Add a prod project at PLAN 7.3 (the free tier allows two active projects).
-- **Cloudflare R2:** one **dev** bucket. Set its CORS to allow `http://localhost:3000` and your tunnel origins (dev bucket only).
+- **Cloudflare R2:** one **dev** bucket, private. Create an **Account API token** with *Object Read & Write* on that bucket only. Paste `config/r2-cors.json` into the bucket's *Settings → CORS Policy* (`uv run poe r2-cors --rules` prints it), then check with `uv run poe r2-cors`.
 - **A paid model API key.** Never use a free tier with client data.
 - **A password manager** (Bitwarden's free plan is fine). It holds the master copy of `.env` as a secure note.
 

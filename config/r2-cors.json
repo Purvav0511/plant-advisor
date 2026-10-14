@@ -1,0 +1,16 @@
+{
+  "_comment": "CORS for the R2 dev bucket (PLAN 0.5). Browsers upload photos straight to R2 with presigned PUT URLs and view them with presigned GETs; without these rules the browser blocks both. Origins: the local web app, and the phone tunnels from `poe phone` (cloudflared quick tunnels are https://<random>.trycloudflare.com). Paste into the dashboard (bucket → Settings → CORS Policy); check with `uv run poe r2-cors`.",
+  "CORSRules": [
+    {
+      "AllowedOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://*.trycloudflare.com"
+      ],
+      "AllowedMethods": ["GET", "PUT", "HEAD"],
+      "AllowedHeaders": ["Content-Type"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
