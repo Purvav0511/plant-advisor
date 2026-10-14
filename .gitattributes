@@ -1,0 +1,29 @@
+# One line-ending rule for every machine: LF in the repo and in every checkout
+# (macOS, WSL2 and native Windows). Overrides each machine's core.autocrlf.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary: never convert
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.heic binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xlsx binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+# Lockfiles: collapse in GitHub diffs
+uv.lock linguist-generated=true
+pnpm-lock.yaml linguist-generated=true

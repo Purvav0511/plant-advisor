@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------
+# NEVER COMMIT: client documents, private photos, secrets.
+# This block must exist before the first commit.
+# These files move between machines with `uv run poe raw-pull` (R2), not git.
+# ---------------------------------------------------------------
+data/raw/
+evals/photos/private/
+ingestion/reports/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.pnpm-store/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# Supabase CLI (local stack state)
+supabase/.branches/
+supabase/.temp/
+
+# Claude Code: personal per-machine settings (shared settings.json IS committed)
+.claude/settings.local.json
+
+# OS and editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

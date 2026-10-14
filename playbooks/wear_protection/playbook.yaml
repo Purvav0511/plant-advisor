@@ -1,0 +1,217 @@
+# Wear protection playbook: STARTER DRAFT
+# Everything below is a draft for the tenant's engineers to review and approve.
+# Weights and rules come from the tenant's data sheets plus general wear-engineering knowledge.
+# They are NOT validated. Import as status=draft; the live pipeline uses approved versions only.
+
+id: wear_protection
+version: 1
+status: draft
+question: "Why is this component wearing out, and what will make it last longer?"
+product_families: [composite_wear_plate, hardfacing_wire]
+follow_up_after_days: 30
+fast_failure_days: 60          # a case that fails before this is flagged for rule review
+
+vocabulary:
+  mechanisms:
+    - {code: abrasion,         label: Abrasion,         description: "Hard particles sliding or rolling across the surface"}
+    - {code: erosion,          label: Erosion,          description: "Fine particles carried in a fast stream striking the surface"}
+    - {code: impact,           label: Impact,           description: "Lumps or objects striking with force"}
+    - {code: corrosion,        label: Corrosion,        description: "Chemical or moist attack, often combined with abrasion"}
+    - {code: high_temperature, label: High temperature, description: "Heat softening, oxidation, thermal fatigue"}
+    - {code: sticking,         label: Sticking,         description: "Material building up and blocking flow"}
+  visual_features:
+    - {code: grooves_along_flow,  label: "Grooves or scratches along the material flow"}
+    - {code: polished_thinning,   label: "Smooth, polished thinning"}
+    - {code: wavy_surface,        label: "Wavy or rippled worn surface"}
+    - {code: localized_hole,      label: "Hole or worn-through spot at an impingement point"}
+    - {code: dents,               label: "Dents or depressions"}
+    - {code: chipping,            label: "Chipped or broken-off pieces"}
+    - {code: cracks,              label: "Cracks"}
+    - {code: edge_deformation,    label: "Flattened, rolled or deformed edges"}
+    - {code: pitting,             label: "Pitting"}
+    - {code: rust,                label: "Rust or corrosion products"}
+    - {code: oxide_scale,         label: "Oxide scale or flaking"}
+    - {code: heat_discoloration,  label: "Heat discoloration (blue, straw, dark tints)"}
+    - {code: material_buildup,    label: "Material build-up or caking"}
+    - {code: uniform_thinning,    label: "Uniform thinning over a large area"}
+  component_types:
+    - {code: chute,           label: Chute}
+    - {code: hopper,          label: Hopper}
+    - {code: fan_blade,       label: Fan blade}
+    - {code: fan_casing,      label: Fan casing}
+    - {code: impeller,        label: Impeller}
+    - {code: liner,           label: Mill or bin liner}
+    - {code: screw_conveyor,  label: Screw conveyor}
+    - {code: crusher_part,    label: Crusher part}
+    - {code: duct,            label: Duct}
+    - {code: classifier_blade, label: Classifier blade}
+    - {code: bucket,          label: Bucket, teeth or lip}
+    - {code: other,           label: Other}
+  materials:
+    - {code: clinker, label: Clinker}
+    - {code: coal, label: Coal}
+    - {code: limestone, label: Limestone}
+    - {code: iron_ore, label: Iron ore}
+    - {code: sand, label: Sand}
+    - {code: gypsum, label: Gypsum}
+    - {code: fly_ash, label: Fly ash}
+    - {code: cement, label: Cement}
+    - {code: sinter, label: Sinter}
+    - {code: other, label: Other}
+  industries: [cement, power, steel, mining, minerals, other]
+  wear_levels: {1: low, 2: medium, 3: high, 4: very_high, 5: excellent}   # matches the data sheets' scale
+
+questions:
+  - {id: material_handled, text: "What material runs through or hits this component?", type: select, options_from: materials, required: true, discriminates: [abrasion, erosion, sticking]}
+  - {id: temperature, text: "How hot does it get?", type: select, required: true,
+     options: [{code: ambient, label: "Ambient (under 100°C)"}, {code: warm, label: "100–300°C"}, {code: hot, label: "300–500°C"}, {code: very_hot, label: "Over 500°C"}],
+     discriminates: [high_temperature]}
+  - {id: temperature_c, text: "Known temperature in °C (optional)", type: number, required: false}
+  - {id: wet_or_dry, text: "Is the material wet, damp or dry?", type: select, required: true,
+     options: [{code: wet, label: Wet}, {code: damp, label: Damp}, {code: dry, label: Dry}], discriminates: [corrosion, sticking, abrasion]}
+  - {id: particle_size, text: "What size is the material?", type: select, required: true,
+     options: [{code: fine, label: "Fine powder or dust"}, {code: granular, label: "Granular"}, {code: lumps, label: "Lumps or rocks"}], discriminates: [erosion, abrasion, impact]}
+  - {id: impact, text: "Does material drop onto it or hit it hard?", type: select, required: true,
+     options: [{code: none, label: "No"}, {code: some, label: "Somewhat"}, {code: high, label: "Yes, heavy drops or hits"}], discriminates: [impact, abrasion]}
+  - {id: current_lining, text: "What is fitted there now?", type: select, required: false,
+     options: [{code: mild_steel, label: "Plain steel"}, {code: wear_plate, label: "A wear plate"}, {code: hardfaced, label: "Hardfacing weld"}, {code: ceramic, label: Ceramic}, {code: unknown, label: "Not sure"}]}
+  - {id: life_of_current_days, text: "How long did the current lining last? (days)", type: number, required: true}
+  - {id: notes, text: "Anything else we should know?", type: text, required: false}
+
+# JSON Schema for products.attributes in this family
+family_schema:
+  type: object
+  additionalProperties: false
+  properties:
+    product_family: {enum: [composite_wear_plate, hardfacing_wire]}
+    alloy_system: {type: string}
+    standard: {type: [string, "null"]}
+    wear_profile:
+      type: object
+      properties:
+        abrasion: {type: integer, minimum: 1, maximum: 5}
+        erosion: {type: integer, minimum: 1, maximum: 5}
+        impact: {type: integer, minimum: 1, maximum: 5}
+        corrosion: {type: integer, minimum: 1, maximum: 5}
+        temperature: {type: integer, minimum: 1, maximum: 5}
+        inferred: {type: boolean, description: "true when levels were inferred from text, not given on the sheet"}
+    max_service_temp_c: {type: [number, "null"], minimum: 0, maximum: 1500}
+    anti_sticking: {type: boolean}
+    hardness:
+      type: array
+      items: {type: object, required: [hrc_min, hrc_max], properties: {overlay_mm: {type: [number, "null"]}, layer: {type: [integer, "null"]}, hrc_min: {type: number, minimum: 20, maximum: 75}, hrc_max: {type: number, minimum: 20, maximum: 75}}}
+    composition:
+      type: array
+      items: {type: object, required: [element], properties: {element: {type: string}, min: {type: [number, "null"], minimum: 0, maximum: 100}, max: {type: [number, "null"], minimum: 0, maximum: 100}, basis: {enum: [undiluted, layer_1, layer_2, layer_3, typical]}}}
+    microstructure:
+      type: array
+      items: {type: object, properties: {constituent: {type: string}, min_pct: {type: number}, max_pct: {type: number}}}
+    lab_results:
+      type: array
+      items: {type: object, properties: {test: {type: string}, overlay_mm: {type: [number, "null"]}, weight_loss_g: {type: number}, reference: {type: string}, reference_weight_loss_g: {type: number}}}
+    plate_formats:
+      type: object
+      properties:
+        thickness_combos: {type: array, items: {type: object, properties: {base_mm: {type: number}, overlay_mm: {type: number}}}}
+        sizes_mm: {type: array, items: {type: string}}
+        bead_patterns: {type: array, items: {type: string}}
+    welding_params:
+      type: array
+      items: {type: object, properties: {diameter_mm: {type: number}, voltage_min: {type: number}, voltage_max: {type: number}, amps_min: {type: number}, amps_max: {type: number}, polarity: {type: string}, stick_out_mm: {type: [string, "null"]}}}
+    installation: {type: object, properties: {mounting: {type: array, items: {type: string}}, joining_notes: {type: string}}}
+    applications_components: {type: array, items: {type: string}}
+    industries: {type: array, items: {type: string}}
+
+scoring:
+  # feature -> {mechanism: weight}; multiplied by severity/3 and the feature's confidence
+  feature_weights:
+    grooves_along_flow: {abrasion: 1.0}
+    polished_thinning:  {erosion: 1.0}
+    wavy_surface:       {erosion: 0.7, abrasion: 0.2}
+    localized_hole:     {erosion: 0.6, abrasion: 0.3}
+    dents:              {impact: 1.0}
+    chipping:           {impact: 0.8}
+    cracks:             {impact: 0.6, high_temperature: 0.3}
+    edge_deformation:   {impact: 0.7}
+    pitting:            {corrosion: 0.9}
+    rust:               {corrosion: 0.8}
+    oxide_scale:        {high_temperature: 0.8}
+    heat_discoloration: {high_temperature: 0.6}
+    material_buildup:   {sticking: 1.0}
+    uniform_thinning:   {abrasion: 0.5, corrosion: 0.3}
+  # question -> answer -> {mechanism: weight}
+  answer_weights:
+    material_handled: {clinker: {abrasion: 0.4}, iron_ore: {abrasion: 0.4, impact: 0.2}, sand: {abrasion: 0.4}, sinter: {abrasion: 0.3, high_temperature: 0.3}, fly_ash: {erosion: 0.4}, coal: {abrasion: 0.2, erosion: 0.2}, limestone: {abrasion: 0.2, sticking: 0.3}, gypsum: {sticking: 0.4}, cement: {erosion: 0.2, sticking: 0.2}}
+    temperature: {warm: {high_temperature: 0.2}, hot: {high_temperature: 0.6}, very_hot: {high_temperature: 0.9}}
+    wet_or_dry: {wet: {corrosion: 0.5, sticking: 0.3}, damp: {corrosion: 0.3, sticking: 0.4}}
+    particle_size: {fine: {erosion: 0.4, sticking: 0.2}, granular: {abrasion: 0.3}, lumps: {impact: 0.4, abrasion: 0.2}}
+    impact: {some: {impact: 0.3}, high: {impact: 0.7}}
+  component_priors:
+    fan_blade: {erosion: 0.5}
+    fan_casing: {erosion: 0.4}
+    duct: {erosion: 0.5}
+    classifier_blade: {erosion: 0.4, abrasion: 0.2}
+    chute: {abrasion: 0.4, impact: 0.3}
+    hopper: {abrasion: 0.3, sticking: 0.3}
+    impeller: {erosion: 0.4, abrasion: 0.3}
+    liner: {abrasion: 0.4, impact: 0.2}
+    screw_conveyor: {abrasion: 0.5}
+    crusher_part: {impact: 0.6, abrasion: 0.3}
+    bucket: {abrasion: 0.4, impact: 0.4}
+  case_weight: 0.6              # weight of similar approved cases (verified count double)
+  case_k: 5
+  question_margin: 0.15         # ask a narrowing question when the top-2 gap is below this
+  active_threshold: 0.5         # a mechanism counts as "present" at or above this normalized score
+
+# Remedy rules: condition (JSON-logic over {diagnosis, answers, component}) -> action
+# Actions: require (hard filters on attributes), prefer (soft ordering), thickness, installation
+remedy_rules:
+  - name: abrasion_requires_high_abrasion_resistance
+    condition: {">=": [{var: "diagnosis.abrasion"}, 0.5]}
+    action: {require: [{">=": [{var: "attributes.wear_profile.abrasion"}, 4]}]}
+    rationale: "Significant abrasion needs very high abrasion resistance."
+  - name: erosion_requires_high_erosion_resistance
+    condition: {">=": [{var: "diagnosis.erosion"}, 0.5]}
+    action: {require: [{">=": [{var: "attributes.wear_profile.erosion"}, 4]}]}
+    rationale: "Significant erosion needs very high erosion resistance."
+  - name: impact_requires_toughness
+    condition: {">=": [{var: "diagnosis.impact"}, 0.5]}
+    action:
+      require: [{">=": [{var: "attributes.wear_profile.impact"}, 3]}]
+      prefer: [{order_by: "attributes.wear_profile.impact", direction: desc}]
+    rationale: "Impact needs toughness; very hard overlays can crack under heavy impact."
+  - name: corrosion_requires_resistance
+    condition: {">=": [{var: "diagnosis.corrosion"}, 0.4]}
+    action: {require: [{">=": [{var: "attributes.wear_profile.corrosion"}, 3]}]}
+    rationale: "Wet or corrosive service needs corrosion resistance."
+  - name: temperature_limit
+    condition: {"in": [{var: "answers.temperature"}, ["warm", "hot", "very_hot"]]}
+    action: {require_temperature_margin_c: 50}
+    rationale: "The product's max service temperature must exceed the reported temperature with margin."
+  - name: sticking_prefers_anti_sticking
+    condition: {">=": [{var: "diagnosis.sticking"}, 0.5]}
+    action: {prefer: [{"==": [{var: "attributes.anti_sticking"}, true]}]}
+    rationale: "Build-up problems favor anti-sticking finishes."
+  - name: thickness_for_fast_failure
+    condition: {"<": [{var: "answers.life_of_current_days"}, 90]}
+    action: {thickness_overlay_mm: 8}
+    rationale: "Short current life suggests the thicker overlay."
+  - name: thickness_default
+    condition: {">=": [{var: "answers.life_of_current_days"}, 90]}
+    action: {thickness_overlay_mm: 4}
+    rationale: "Default overlay thickness."
+  - name: installation_rotating_parts
+    condition: {"in": [{var: "component.component_type"}, ["fan_blade", "impeller", "bucket"]]}
+    action: {installation_options: [hardfacing_wire, composite_wear_plate]}
+    rationale: "Complex or rotating parts are often rebuilt in place by hardfacing; plates suit flat surfaces."
+  - name: installation_flat_surfaces
+    condition: {"in": [{var: "component.component_type"}, ["chute", "hopper", "liner", "duct", "fan_casing", "screw_conveyor"]]}
+    action: {installation_options: [composite_wear_plate, hardfacing_wire]}
+    rationale: "Flat or simple surfaces suit bolted or welded wear plates."
+
+checks:
+  - {id: product_exists_and_approved}
+  - {id: temp_limit_ok, params: {margin_c: 50}}
+  - {id: wear_profile_covers_diagnosis, params: {active_threshold: 0.5, min_level: {abrasion: 4, erosion: 4, impact: 3, corrosion: 3}}}
+  - {id: format_offered}
+  - {id: no_contradiction_with_installation, params: {fast_failure_days: 60}}
