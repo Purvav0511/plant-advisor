@@ -6,28 +6,30 @@ Work through the tasks in order. Each task has a **Done when** check, and the ta
 
 Legend: 🧪 write tests first · 👤 needs the human (accounts, approvals, photos)
 
+Design decisions 0002–0017 (`docs/decisions/`) were applied to this plan on 2026-10-13.
+
 ---
 
 ## Phase 0: Setup
 
 **0.1 👤 Accounts, secrets and the first machine**
 
-Create the accounts (DEV_SETUP §3):
-- GitHub private repository, with the Claude GitHub App if you'll use cloud sessions
-- Supabase **dev** project
-- Cloudflare account with an R2 **dev** bucket
-- Google Cloud project with Cloud Run and Cloud Scheduler
-- Langfuse
-- Sentry
-- A paid model API key
+Create the accounts (DEV_SETUP §3), each when it's first needed:
+- GitHub private repository (done: `Purvav0511/plant-advisor`), with the Claude GitHub App if you'll use cloud sessions
+- Supabase **dev** project, using asymmetric JWT signing keys (by 0.5)
+- Cloudflare account with an R2 **dev** bucket (by 0.5)
+- An Anthropic API key, paid (by 1.8)
 - A password manager note holding the `.env` values
+- Langfuse (by 3.1)
+- Resend for email (by 4.9)
+- Google Cloud project with Cloud Run and Cloud Scheduler, and Sentry (by 7.3)
 
 Then:
 - Set up the first machine per DEV_SETUP §4.
 - Push this handoff package as the first commit. The provided `.gitignore` already protects `data/raw/`.
 - Fill in `.env` from `.env.example`.
 
-Done when: the first machine passes DEV_SETUP §4, and `uv run poe doctor` (after task 0.2) reports every variable present.
+Done when: the first machine passes DEV_SETUP §4, and `uv run poe doctor` (after task 0.2) reports every variable present. Variables for accounts that aren't needed yet may be empty.
 
 **0.2 Repository skeleton and the cross-platform task runner**
 - Create the layout from CLAUDE.md:
@@ -94,22 +96,22 @@ Done when:
 ## Phase 1: Data model and knowledge
 
 **1.1 🧪 Core schema migration**
-- Create every table from SPEC §5, plus the indexes and the `requests` and `requests_dlq` queues.
+- Create every table from SPEC §5 (including `plant_invites`, `chat_messages`, `knowledge_proposals`, `products.code` and `profiles.roles`), plus the indexes and the `requests` and `requests_dlq` queues.
 
 Done when: migrations apply cleanly from scratch and an integration test inserts and reads one row per table.
 
 **1.2 🧪 `transition_request()` and the events table**
-- A plpgsql function that enforces the transitions table from SPEC §6 and writes `events`.
+- A plpgsql function that enforces the transitions table from SPEC §6 (including the `sales` role and "quote needs an approved review") and writes `events`. Mechanics per decision 0013.
 
-Done when: tests cover every allowed transition and reject a sample of disallowed ones, and a direct `UPDATE requests SET status` is blocked by a trigger.
+Done when: tests cover every allowed transition and reject a sample of disallowed ones, a direct `UPDATE requests SET status` is blocked by a trigger, and two concurrent claims leave exactly one winner.
 
 **1.3 🧪 RLS policies**
-- Plant users see only their plants' requests and components. Engineers and admins see their tenant. Nobody sees another tenant.
+- Plant users see only their plants' requests and components, and all requests of those plants (shared history). Staff (engineer, sales, admin) see their tenant. Nobody sees another tenant. Plant users never see `chat_messages` or `knowledge_proposals`.
 
-Done when: tests impersonate the three roles across two seeded tenants and pass.
+Done when: tests impersonate the four roles across two seeded tenants and pass.
 
 **1.4 Seed data**
-- `supabase/seed/`: one tenant, two customers, three plants, about 12 components across chutes, fans, hoppers and liners, and three users (one per role).
+- `supabase/seed/`: one tenant, two customers, three plants, about 12 components across chutes, fans, hoppers and liners, four users (plant user, engineer, sales, admin) plus one user who is both engineer and sales, and one open plant invite code.
 
 Done when: `uv run poe seed` loads the data and the app can sign in as each user (after 5.1).
 
@@ -153,13 +155,13 @@ Done when: the report renders and the human has reviewed the extracted values ag
 
 **2.1 👤 Test set v0**
 - The human photographs 15–30 worn parts or surfaces (hardware-store parts work) with known conditions.
-- Write `evals/wear_protection/cases/*.yaml` per SPEC §13 and store the photos in `evals/photos/private/`.
+- Write `evals/wear_protection/cases/*.yaml` per SPEC §13. Your own photos go in `assets/eval-photos/` (committed, resized to ≤ 1600 px); client photos go in `evals/photos/private/`.
 
 Done when: at least 15 cases exist with expected mechanisms. Expected products can be filled in once the knowledge is approved.
 
 **2.2 🧪 Eval harness**
 - `evals/harness.py` runs a callable over the cases and computes the SPEC §13 metrics.
-- It records model responses to `evals/recordings/` and replays them when `LIVE` isn't set.
+- It records model responses to `evals/recordings/` and replays them unless `--live` is passed. Recordings are keyed by content hashes, and a missing one fails loudly (decision 0011).
 
 Done when: a dummy predictor produces a correct report.
 
@@ -189,17 +191,17 @@ Done when: round-trip tests pass and JSON Schemas are exported for prompts.
 Done when: tests cover missing answers (leading to `needs_info`) and a component with installation history.
 
 **3.4 🧪 Stage 2: Evidence**
-- Prompt `prompts/evidence.v1.md` with the playbook vocabulary; vocabulary validation; image embeddings with open_clip.
+- Prompt `prompts/evidence.v1.md` with the playbook vocabulary; vocabulary validation; `missing_views`; image embeddings with open_clip (a fake embedder in unit tests).
 
-Done when: recorded-response tests pass, unknown feature codes trigger one retry and then a failure, and an unusable photo leads to `needs_info`.
+Done when: recorded-response tests pass, unknown feature codes trigger one retry and then a failure, and an unusable photo or a missing required view leads to `needs_info` with a specific ask.
 
 **3.5 🧪 Stage 3: Diagnosis**
-- Scoring from the playbook weights, case-memory k-NN, the margin, and choosing the narrowing question.
+- Scoring from the playbook weights, case-memory k-NN, the margin, `evidence_mass`, and choosing the narrowing question.
 
 Done when: table-driven tests cover the expected rankings for crafted evidence and the question chosen at a low margin.
 
 **3.6 🧪 Stage 4: Remedy**
-- Rules produce requirements and preferences, the database filters the candidates, and the model ranks them (candidate IDs only).
+- Rules produce requirements and preferences, the rule evaluator filters the family's approved products in Python (decision 0002), and the model ranks them (candidate IDs only).
 
 Done when: tests reject a hallucinated product ID, relax preferences but never requirements, and handle `no_candidates`.
 
@@ -209,9 +211,9 @@ Done when: tests reject a hallucinated product ID, relax preferences but never r
 Done when: each check has passing and failing tests, and a failure triggers a single Stage 4 rerun with feedback.
 
 **3.8 🧪 Stage 6: Confidence and explanation**
-- Heuristic confidence from `config/thresholds.yaml`; the explanation prompt uses only structured inputs.
+- Heuristic confidence from `config/thresholds.yaml`, including evidence mass; the explanation prompt uses only structured inputs.
 
-Done when: tests show confidence goes up with margin and passing checks, and the `low_confidence` flag is set below the threshold.
+Done when: tests show confidence goes up with margin, evidence mass and passing checks, and the `low_confidence` flag is set below the threshold.
 
 **3.9 🧪 Orchestrator, checkpoints and cache**
 - Run stages 1–6 with `pipeline_runs` checkpoints, resume, and a `cache_key` hit that reuses the analysis.
@@ -219,9 +221,9 @@ Done when: tests show confidence goes up with margin and passing checks, and the
 Done when: an integration test kills the run after stage 3, reruns it, and stages 1–3 aren't repeated. Running the same request twice gives one analysis.
 
 **3.10 🧪 Worker drain and DLQ**
-- Implement `POST /drain` (shared secret, time budget), loop mode for local use, the pgmq read, visibility timeout and archive, and the DLQ after `read_ct > 3`.
+- Implement `POST /drain` (shared secret, time budget), loop mode for local use, the pgmq read, visibility timeout and archive, and the DLQ after `read_ct > 3`. Typed messages: `analyze` and `embed_case`. Put the queue behind a `Queue` interface and keep the drain core a plain function (decision 0009).
 
-Done when: integration tests cover a successful run, a transient failure that recovers, and a poison message that lands in the DLQ with the request `failed`.
+Done when: integration tests cover a successful run, a transient failure that recovers, a poison message that lands in the DLQ with the request `failed`, and an `embed_case` message that fills a case's embeddings.
 
 **3.11 Pipeline eval**
 - Run the full pipeline on the test set and compare it with the baseline.
@@ -233,25 +235,27 @@ Done when: `uv run poe eval-report` shows both systems side by side. Don't tune 
 ## Phase 4: API
 
 **4.1 🧪 Auth middleware**
-- Supabase JWT verification and profile lookup. Role checks are a dependency.
+- Supabase JWT verification and profile lookup. Role checks are a dependency. Every transaction runs `SET LOCAL ROLE authenticated` with the claims (decision 0012).
 
-Done when: tests cover valid, expired and wrong-tenant tokens.
+Done when: tests cover valid, expired and wrong-tenant tokens, and a query without a tenant filter still returns only the caller's rows.
 
 **4.2 🧪 Uploads and request creation**
-- Presigned R2 URLs; `POST /requests` saves, enqueues in the same transaction and kicks `/drain`.
+- Presigned R2 URLs; `POST /requests` saves, enqueues in the same transaction and kicks `/drain` before responding.
 
 Done when: an integration test goes from a created request to `ready_for_review` with a fake gateway.
 
 **4.3 🧪 Read endpoints**
-- List and detail with signed photo URLs, the timeline from `events`, and role filtering.
+- List and detail with signed photo URLs, the timeline from `events`, and role filtering. Plant users get the analysis filtered per SPEC §6 (preliminary or confirmed; products withheld on `low_confidence`, `checks_failed` or `no_candidates`) and the contact's phone.
+
+Done when: tests cover each visibility case for a plant user.
 
 **4.4 🧪 Engineer actions**
-- Claim and release, review (creating a `cases` row on approve or edit), messages.
+- Claim and release, review (creating a `cases` row on approve or edit and enqueuing `embed_case`), messages.
 
-Done when: tests cover two engineers claiming at once (only one succeeds) and the case row with its embeddings.
+Done when: tests cover two engineers claiming at once (only one succeeds), the case row, and its `embed_case` message.
 
 **4.5 Quotes**
-- Item selection, a PDF through ReportLab, storage in R2, then `quote_sent`.
+- Item selection, a PDF through ReportLab, storage in R2, then `quote_sent`. Requires the `sales` role and an approved or edited review.
 
 **4.6 🧪 Answers and outcomes**
 - `needs_info` answers re-enqueue the request. An outcome marks the case `verified` or `flagged`.
@@ -260,6 +264,17 @@ Done when: tests cover two engineers claiming at once (only one succeeds) and th
 - Drafts list, approve and reject (writing `approved_by` and `approved_at`, bumping the version), and the issue list.
 
 Done when: approving the wear playbook, its rules and its products makes them visible to the pipeline. A draft is never visible.
+
+**4.8 🧪 Invites and onboarding**
+- `POST /invites` (admin) and `POST /invites/redeem`: a signed-in user without a profile redeems a code and gets a profile bound to its plants (decision 0004). Codes expire and have a use limit.
+
+Done when: tests cover a valid, expired, exhausted and wrong-tenant code.
+
+**4.9 Ticket notifications**
+- On `analysis_ready`, email staff a link to `/console/request?id=…` (Resend; `EMAIL_API_KEY`, `EMAIL_FROM`, `APP_BASE_URL`).
+
+**4.10 🧪 Knowledge proposals**
+- Create, list, approve and reject `knowledge_proposals`. Approval requires an attached eval report with no increase in the confident-but-wrong rate (SPEC §11).
 
 ---
 
@@ -271,9 +286,10 @@ Done when: approving the wear playbook, its rules and its products makes them vi
 - If there are no frames yet, skip this and use shadcn/ui defaults.
 
 **5.1 App shell and auth**
-- Next.js static export, Tailwind and shadcn/ui, Supabase auth with a one-time code, and role-based redirects to `/plant` or `/console`.
+- Next.js static export, Tailwind and shadcn/ui with the Figma tokens, Supabase auth with a one-time code, the invite / plant-code join flow, and role-based redirects to `/plant` or `/console`. Detail pages use query strings (decision 0014).
 
 **5.2 Plant: home and component picker**
+- The plant's shared request history, with an empty state. Unsent drafts (photos and answers) are kept in IndexedDB.
 
 **5.3 Plant: guided capture**
 - Camera input, the client-side blur and brightness checks, a coin confirmation, direct upload to R2.
@@ -283,7 +299,8 @@ Done when: a blurry test image triggers a retake prompt.
 **5.4 Plant: conditions form**
 - Rendered from the playbook questions returned by the API, with no hardcoded fields.
 
-**5.5 Plant: status, messages, quote, follow-up**
+**5.5 Plant: status, recommendation, contact, messages, quote, follow-up**
+- Preliminary and confirmed recommendation per SPEC §6, with call (`tel:`), text (`sms:`) and in-app message actions.
 
 **5.6 PWA**
 - Manifest, icons, a service worker, an installable app, and an offline-friendly shell.
@@ -292,7 +309,7 @@ Done when: a blurry test image triggers a retake prompt.
 - Supabase Realtime subscription, filters and claiming.
 
 **5.8 Console: request detail**
-- Photos with evidence, the diagnosis, recommendations with cited fields, checks, confidence and flags, the copilot draft, and the review actions.
+- Photos with evidence, the diagnosis, recommendations with cited fields, checks, confidence and flags, the ticket chat, and the review actions (approve and edit for engineers; quote and status for sales).
 
 **5.9 Console: quote, component history, knowledge review**
 
@@ -325,14 +342,15 @@ Done when (whole phase):
 Done when: a test shows an approved case shifts the diagnosis for a similar photo.
 
 **6.2 🧪 MCP server**
-- The tools from SPEC §12, tenant-scoped through the service token, read-only except `save_copilot_draft`.
+- The tools from SPEC §12, tenant-scoped through the service token, read-only except `propose_knowledge_change`.
 
 Done when: tests show a tool called with tenant A's token never returns tenant B's data.
 
-**6.3 Copilot**
-- An `analysis_ready` consumer with a cap of 8 tool calls and a cost cap. It writes `copilot_drafts`.
+**6.3 🧪 Ticket chat copilot and guardrails**
+- `GET/POST /requests/{id}/chat`: a turn loads the ticket context, uses the MCP tools (cap of 8 calls and a cost cap per message) and stores `chat_messages` with sources.
+- The guardrail layers from SPEC §12: topic classifier, ticket-scoped prompt, read-only tools, output validation, caps.
 
-Done when: every analyzed request in the demo has a draft with sources.
+Done when: tests (recorded responses) show an off-topic message is blocked, a prompt injection in a technician's note doesn't change the copilot's behaviour, a mention of a nonexistent product is rejected, tenant B's data is never reachable, and a correction produces a `knowledge_proposals` row, not a knowledge change.
 
 **6.4 Follow-up**
 - A `request_closed` event schedules the follow-up prompt in the plant app, for example at 30 days, configurable per playbook.
@@ -350,8 +368,9 @@ Done when: the report shows the pipeline against the baseline on held-out cases,
 - Once at least 50 cases exist, fit isotonic calibration for confidence and report the ECE. Below that, keep the heuristic and say so in the report.
 
 **7.3 Deploy**
+- First, decide Cloud Run vs AWS with the measured per-request time from 7.1 and the company's infrastructure needs (decision 0009), and record the outcome as a decision note.
 - Cloud Run services (api, worker, mcp), using images built in CI for `linux/amd64`.
-- Cloud Scheduler hitting `/drain`.
+- Cloud Scheduler hitting `/drain` every minute. Check that the API's kick before responding reaches the worker.
 - The web app on Cloudflare Pages, with a preview deployment per pull request that points at a dev API.
 - A hosted Supabase **prod** project with migrations applied.
 
