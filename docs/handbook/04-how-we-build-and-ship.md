@@ -57,6 +57,13 @@ hotfix/urgent-fix ──PR──▶ main, then main ──PR──▶ dev
 | Dependabot | GitHub | Opens PRs to update libraries, so security fixes arrive |
 | Weekly audit | GitHub | Reports known vulnerabilities in our libraries |
 
+## Library updates
+
+Dependabot opens update PRs into `dev`, grouped by type (Python, Node, GitHub Actions, Docker). The rules ([decision 0020](03-decisions.md#0020-how-library-updates-are-allowed-in)):
+- **Only versions at least 14 days old.** pnpm enforces this on every install too.
+- **No major versions automatically.** Those become a planned story.
+- **Read and merge them like any other PR:** CI must be green, and you tick the reading box. For a lockfile, "reading" means checking which packages changed and by how much; the PR lists them.
+
 ## A change from start to finish
 
 1. Pick the next story on the [board](06-the-board.md) and move it to *In progress*.

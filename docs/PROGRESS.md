@@ -8,17 +8,23 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/0.4-local-supabase` (PR into `dev`)
-- **PLAN task:** 0.4 Local Supabase for integration tests (story #8)
+- **Branch:** `fix/dependabot-policy` (PR into `dev`, closes #77)
+- **PLAN task:** 0.4 done (merged #76). This is maintenance outside PLAN: the dependency update policy (decision 0020).
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1: 0.1, 0.4, 0.5, 0.6).
-- **Next step:** owner reads and merges the 0.4 PR; then PLAN 0.5 once the owner's Supabase dev project and R2 bucket exist and `.env` is filled in.
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.5, 0.6). Auto-add is on.
+- **Next step:** owner reads and merges this PR; close Dependabot PRs #74 and #75 so they return under the new rules; then PLAN 0.5 (from `dev`: `uv run poe migrate`, R2 CORS, `raw-push`/`raw-pull`).
+- **Shared dev database:** reachable from pc-wsl; migration `20261014020917` not applied yet (first step of 0.5).
 - **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73).
-- **Waiting on the owner:** Supabase dev project and R2 bucket (instructions given 2026-10-14); fill `.env`; then `uv run poe doctor` should show the database reachable.
-- **Open Dependabot PRs:** #74 (actions), #75 (node packages). Review after 0.4.
-- **On the other machine (Mac):** not set up yet.
+- **On the other machine (Mac):** not set up yet. Its `.env` comes from the password manager (Supabase and R2 values now exist).
 
 ## Log
+
+### 2026-10-14 · pc-wsl · maintenance (#77)
+- **Changed:** `.github/dependabot.yml` (14-day cooldown, no automatic majors, `@types/node` < 23, Docker Python < 3.13); `pnpm-workspace.yaml` `minimumReleaseAge: 20160`; `apps/web` `@types/node` ^20 → ^22; `pnpm-lock.yaml` re-resolved under the rule.
+- **Also (0.4 follow-up, merged in #76):** remote `poe migrate` runs only from a clean `dev` level with GitHub; found during the owner's walkthrough.
+- **Decisions:** [0020](decisions/0020-dependency-update-policy.md) dependency update policy.
+- **Next:** PLAN 0.5.
+- **On the other machine:** `git pull`, then `pnpm install` (the lockfile changed).
 
 ### 2026-10-14 · pc-wsl · 0.4
 - **Changed:** `supabase/` (`supabase init`; seeding off until 1.4) and the first migration enabling `vector` and `pgmq`.
