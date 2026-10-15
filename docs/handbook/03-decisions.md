@@ -262,3 +262,20 @@ Urgent **security** fixes skip the waiting period, so they still arrive quickly.
 | A powerful key so scripts can change settings | Fully automated | Far more damage if the key leaks |
 | Sync like a shared drive ("last save wins") | Simple | Silently loses one copy when two differ |
 | Put client files in git | One tool | Client data would end up on GitHub, which is forbidden |
+
+---
+
+## 0022: The database itself refuses bad data
+*Technical note: [0022](../decisions/0022-schema-conventions.md)*
+
+**Decision:** the database (the 25 tables from the spec) enforces its own rules, instead of trusting that every piece of code gets them right:
+- **Links are checked.** A photo must belong to a real request, and a request to a real plant. A plant can only belong to a customer of the **same company**: one supplier's data can never be linked to another's, even by a bug.
+- **Nothing that others depend on can be deleted.** Old things are retired with a status instead, so the history stays complete.
+- **Only valid values are accepted.** For example a request's status must be one of the eight in the spec, and confidence must be between 0 and 1.
+- **Locked by default.** Every table has row-level security switched on. Until the access rules arrive (task 1.3), only the server itself can read anything.
+
+| Option | Pros | Cons |
+|---|---|---|
+| **Database enforces the rules (chosen)** | Bad data is impossible, whichever code writes it | A little more design up front |
+| Only the application code checks | Simpler schema | Every code path must remember every rule |
+| Allow deletes that cascade to related rows | Easy cleanup | One delete can silently erase history |

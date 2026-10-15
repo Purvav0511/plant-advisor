@@ -10,6 +10,7 @@ The plain-language companion to the technical docs. Read this to understand the 
 | [4. How we build and ship](04-how-we-build-and-ship.md) | Branches, environments, automated checks, and how a change reaches production |
 | [5. Working with AI](05-working-with-ai.md) | How we use Claude on this project, and the habits that carry over to a professional team |
 | [6. The board](06-the-board.md) | How epics, stories and cycles are tracked on the GitHub project board |
+| [7. The data model](07-the-data-model.md) | The 25 database tables, what each holds, how they connect, and why they're shaped this way |
 | [Glossary](glossary.md) | Short definitions of every technical term used here |
 
 ## How this handbook stays current
