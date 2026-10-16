@@ -5,9 +5,8 @@ Each test runs in a transaction that is rolled back, so nothing is left behind.
 
 from __future__ import annotations
 
-import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable
 from typing import Any, LiteralString
 
 import psycopg
@@ -17,7 +16,9 @@ from psycopg.types.json import Jsonb
 
 pytestmark = pytest.mark.integration
 
-DEFAULT_TEST_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# The `insert` and `scalar` fixtures from conftest.py.
+Insert = Callable[..., Any]
+Scalar = Callable[..., Any]
 
 # Every table SPEC §5 defines. A table added or dropped without updating this fails a test.
 TABLES = {
@@ -57,68 +58,23 @@ VECTOR_COLUMNS = {
 }
 
 
-@pytest.fixture
-def db() -> Iterator[psycopg.Connection]:
-    url = os.environ.get("DATABASE_URL_TEST") or DEFAULT_TEST_URL
-    with psycopg.connect(url) as conn:
-        try:
-            yield conn
-        finally:
-            conn.rollback()
-
-
-# Tables whose key isn't called `id`.
-KEY_COLUMN = {"profiles": "user_id"}
-
-
-def to_param(value: Any) -> Any:
-    """Dicts and lists of objects go in as JSON; lists of strings or UUIDs as Postgres arrays."""
-    if isinstance(value, dict):
-        return Jsonb(value)
-    if isinstance(value, list) and not all(isinstance(v, str | uuid.UUID) for v in value):
-        return Jsonb(value)
-    return value
-
-
-def insert(db: psycopg.Connection, table: str, **values: Any) -> Any:
-    """Insert one row and return its key."""
-    # Names are composed with sql.Identifier, never pasted into the SQL text.
-    query = sql.SQL("insert into {table} ({cols}) values ({marks}) returning {key}").format(
-        table=sql.Identifier(table),
-        cols=sql.SQL(", ").join(map(sql.Identifier, values)),
-        marks=sql.SQL(", ").join(sql.Placeholder() * len(values)),
-        key=sql.Identifier(KEY_COLUMN.get(table, "id")),
-    )
-    row = db.execute(query, [to_param(v) for v in values.values()]).fetchone()
-    assert row is not None
-    return row[0]
-
-
-def scalar(db: psycopg.Connection, query: LiteralString, params: tuple[Any, ...]) -> Any:
-    """Run a query that returns one row and give back its first column."""
-    row = db.execute(query, params).fetchone()
-    assert row is not None
-    return row[0]
-
-
 def vec(dim: int) -> str:
     return "[" + ",".join(["0.1"] * dim) + "]"
 
 
 @pytest.fixture
-def world(db: psycopg.Connection) -> dict[str, Any]:
+def world(db: psycopg.Connection, insert: Insert, scalar: Scalar) -> dict[str, Any]:
     """One row in every table, inserted in dependency order. Returns their keys."""
     w: dict[str, Any] = {}
-    w["tenant"] = insert(db, "tenants", name="Supplier A")
+    w["tenant"] = insert("tenants", name="Supplier A")
     t = w["tenant"]
-    w["customer"] = insert(db, "customers", tenant_id=t, name="Cement Co")
+    w["customer"] = insert("customers", tenant_id=t, name="Cement Co")
     w["plant"] = insert(
-        db, "plants", tenant_id=t, customer_id=w["customer"], name="Plant 1", location="North"
+        "plants", tenant_id=t, customer_id=w["customer"], name="Plant 1", location="North"
     )
     w["user"] = uuid.uuid4()
     db.execute("insert into auth.users (id) values (%s)", (w["user"],))
     insert(
-        db,
         "profiles",
         user_id=w["user"],
         tenant_id=t,
@@ -127,7 +83,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         phone="+10000000000",
     )
     w["invite"] = insert(
-        db,
         "plant_invites",
         tenant_id=t,
         customer_id=w["customer"],
@@ -139,7 +94,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         created_by=w["user"],
     )
     w["component"] = insert(
-        db,
         "components",
         tenant_id=t,
         plant_id=w["plant"],
@@ -148,13 +102,11 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         name="Kiln feed chute",
     )
     w["playbook"] = scalar(
-        db,
         "insert into playbooks (id, tenant_id, version, status, config, family_schema) "
         "values ('wear_protection', %s, 1, 'draft', %s, %s) returning id",
         (t, Jsonb({}), Jsonb({})),
     )
     w["vocab"] = insert(
-        db,
         "vocab_terms",
         tenant_id=t,
         playbook_id="wear_protection",
@@ -165,20 +117,17 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         version=1,
     )
     w["product"] = scalar(
-        db,
         "insert into products (tenant_id, code, family, name, attributes, status, version, "
         "text_embedding) values (%s, 'wp-test', 'composite_wear_plate', 'Test plate', %s, "
         "'draft', 1, %s::extensions.vector) returning id",
         (t, Jsonb({"anti_sticking": False}), vec(384)),
     )
     w["product_image"] = scalar(
-        db,
         "insert into product_images (tenant_id, product_id, r2_key, kind, image_embedding) "
         "values (%s, %s, 'catalog/x.jpg', 'catalog', %s::extensions.vector) returning id",
         (t, w["product"], vec(512)),
     )
     w["installation"] = insert(
-        db,
         "installations",
         tenant_id=t,
         component_id=w["component"],
@@ -187,7 +136,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         installed_on="2026-01-01",
     )
     w["rule"] = insert(
-        db,
         "rules",
         tenant_id=t,
         playbook_id="wear_protection",
@@ -199,7 +147,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         version=1,
     )
     w["issue"] = insert(
-        db,
         "ingestion_issues",
         tenant_id=t,
         source_doc="sheet.pdf",
@@ -208,7 +155,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         severity="warning",
     )
     w["request"] = insert(
-        db,
         "requests",
         tenant_id=t,
         customer_id=w["customer"],
@@ -220,14 +166,12 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
     )
     r = w["request"]
     w["photo"] = scalar(
-        db,
         "insert into request_photos (tenant_id, request_id, r2_key, kind, client_quality, "
         "image_embedding) values (%s, %s, 'req/a.jpg', 'overview', %s, %s::extensions.vector) "
         "returning id",
         (t, r, Jsonb({"blur": 0.9}), vec(512)),
     )
     w["run"] = insert(
-        db,
         "pipeline_runs",
         tenant_id=t,
         request_id=r,
@@ -238,7 +182,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         output={},
     )
     w["analysis"] = insert(
-        db,
         "analyses",
         request_id=r,
         attempt=1,
@@ -248,19 +191,17 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         versions={"model": "m"},
     )
     w["review"] = insert(
-        db, "reviews", tenant_id=t, request_id=r, engineer_id=w["user"], decision="approved"
+        "reviews", tenant_id=t, request_id=r, engineer_id=w["user"], decision="approved"
     )
     w["message"] = insert(
-        db,
         "messages",
         tenant_id=t,
         request_id=r,
         author_id=w["user"],
         body="Can you send a close-up?",
     )
-    w["quote"] = insert(db, "quotes", tenant_id=t, request_id=r, items=[{"code": "wp-test"}])
+    w["quote"] = insert("quotes", tenant_id=t, request_id=r, items=[{"code": "wp-test"}])
     w["outcome"] = insert(
-        db,
         "outcomes",
         tenant_id=t,
         request_id=r,
@@ -269,14 +210,12 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         resolved=True,
     )
     w["case"] = scalar(
-        db,
         "insert into cases (tenant_id, request_id, playbook_id, summary, product_ids, "
         "image_embedding, text_embedding) values (%s, %s, 'wear_protection', 'abrasion on chute', "
         "%s, %s::extensions.vector, %s::extensions.vector) returning id",
         (t, r, [w["product"]], vec(512), vec(384)),
     )
     w["chat"] = insert(
-        db,
         "chat_messages",
         tenant_id=t,
         request_id=r,
@@ -284,7 +223,6 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         body="The diagnosis is abrasion.",
     )
     w["proposal"] = insert(
-        db,
         "knowledge_proposals",
         tenant_id=t,
         request_id=r,
@@ -293,7 +231,7 @@ def world(db: psycopg.Connection) -> dict[str, Any]:
         change={"field": "max_service_temp_c"},
         proposed_by="chat",
     )
-    w["event"] = insert(db, "events", tenant_id=t, request_id=r, type="request_created", payload={})
+    w["event"] = insert("events", tenant_id=t, request_id=r, type="request_created", payload={})
     return w
 
 
@@ -328,12 +266,12 @@ def test_one_row_per_table_inserts_and_reads_back(
 
 
 def test_a_child_row_cannot_point_at_another_tenants_parent(
-    db: psycopg.Connection, world: dict[str, Any]
+    db: psycopg.Connection, world: dict[str, Any], insert: Insert
 ) -> None:
-    other = insert(db, "tenants", name="Supplier B")
+    other = insert("tenants", name="Supplier B")
     with pytest.raises(psycopg.errors.ForeignKeyViolation):
         # A tenant-B plant under tenant A's customer must be refused.
-        insert(db, "plants", tenant_id=other, customer_id=world["customer"], name="Sneaky")
+        insert("plants", tenant_id=other, customer_id=world["customer"], name="Sneaky")
 
 
 @pytest.mark.parametrize(
@@ -355,6 +293,9 @@ def test_a_child_row_cannot_point_at_another_tenants_parent(
 def test_invalid_values_are_refused(
     db: psycopg.Connection, world: dict[str, Any], statement: LiteralString, row: str
 ) -> None:
+    # Requests' status, attempt and claimed_by are also guarded by transition_request()'s
+    # trigger (PLAN 1.2). Switch its flag on so it's the check constraint being tested here.
+    db.execute("select set_config('app.transition', 'on', true)")
     with pytest.raises(psycopg.errors.CheckViolation):
         db.execute(statement, (world[row],))
 
@@ -426,10 +367,10 @@ def test_the_request_queues_exist(db: psycopg.Connection) -> None:
 
 
 def test_every_attempt_keeps_its_own_analysis(
-    db: psycopg.Connection, world: dict[str, Any]
+    db: psycopg.Connection, world: dict[str, Any], insert: Insert
 ) -> None:
     # Re-analysis (e.g. after the technician answers a question) adds a row; nothing is replaced.
-    insert(db, "analyses", request_id=world["request"], attempt=2, tenant_id=world["tenant"])
+    insert("analyses", request_id=world["request"], attempt=2, tenant_id=world["tenant"])
     attempts = db.execute(
         "select attempt from analyses where request_id = %s order by attempt", (world["request"],)
     ).fetchall()
@@ -437,8 +378,8 @@ def test_every_attempt_keeps_its_own_analysis(
 
 
 def test_one_attempt_can_never_get_a_second_analysis(
-    db: psycopg.Connection, world: dict[str, Any]
+    db: psycopg.Connection, world: dict[str, Any], insert: Insert
 ) -> None:
     # Running the same attempt twice must never create a duplicate (CLAUDE.md invariant 4).
     with pytest.raises(psycopg.errors.UniqueViolation):
-        insert(db, "analyses", request_id=world["request"], attempt=1, tenant_id=world["tenant"])
+        insert("analyses", request_id=world["request"], attempt=1, tenant_id=world["tenant"])
