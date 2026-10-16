@@ -87,7 +87,7 @@ All commands are `uv run poe <task>`, and they behave the same on the Mac, in WS
 
 1. **The model never chooses a product outside the candidate list.** Stage 4 passes candidate IDs, and code rejects any other ID. No free-text product names in outputs.
 2. **Only approved knowledge is used live.** The pipeline reads only rows with `status = 'approved'` (products, rules, vocabulary, playbooks) and only cases created from engineer reviews. Drafts are never used.
-3. **Request status changes only along the allowed-transitions table** in SPEC §6, and only through the DB function `transition_request(request_id, to_status, actor)`, which also writes an `events` row. Never update `requests.status` directly.
+3. **Request status changes only along the allowed-transitions table** in SPEC §6, and only through the DB function `transition_request(request_id, to_status, actor, reason)`, which also writes an `events` row. `actor` is only for server code (`'worker'` or `'system'`); people are identified by their login. Never update `requests.status`, `attempt` or `claimed_by` directly (permissions and a trigger refuse it).
 4. **Every pipeline stage is idempotent and checkpointed.** The unique key is `(request_id, attempt, stage)` in `pipeline_runs`. A retry resumes from the last successful stage. Running anything twice must never create a second analysis for the same attempt (`analyses` is unique on `(request_id, attempt)`); a new attempt adds a row and never replaces one.
 5. **All model calls go through the gateway** at temperature 0, with pinned model IDs and versioned prompts. Record `{model, prompt_version, catalog_version, playbook_version}` in `analyses.versions`.
 6. **Tenant isolation:** every query filters by `tenant_id`, RLS is enabled on every table, and MCP tools are scoped to the caller's tenant.
@@ -119,14 +119,16 @@ The owner reads and understands **every changed file** before a PR merges.
 ## Tracking work
 
 - The board is the GitHub project for this repo: epics are PLAN phases, stories are PLAN tasks (issue titles start with the PLAN id). See `docs/handbook/06-the-board.md`.
-- A PR says `Closes #<story>`. Move the story's status as work progresses (`/pickup` and `/handoff` do this).
+- **Split every story into subtasks** before building: GitHub sub-issues of the story, titled `<plan-id>.<letter> <what>` (e.g. `1.3.a Policies for tenancy tables`), labelled `subtask`. Each subtask is one small step the owner can follow.
+- **Commit one subtask at a time, 1–3 files per commit**, with the message `<plan-id>.<letter>: <summary>`. A subtask that needs more files gets split again. The owner's review before committing still applies.
+- A PR says `Closes #<story>` and `Closes #<subtask>` for each subtask. Move the story's status as work progresses (`/pickup` and `/handoff` do this).
 - Every new decision note also gets a plain-language entry in `docs/handbook/03-decisions.md`, in the same PR. New tools get a row in `docs/handbook/02-the-stack.md`.
 
 ## How to work
 
 - Write tests first for the rule evaluator, the status transitions, the stage contracts, the checks and the scoring. Then implement until green.
 - Keep changes scoped to the current PLAN task, and don't refactor unrelated code.
-- Make small commits that start with the task ID, e.g. `3.4: diagnosis scoring`. Run `uv run poe check` first.
+- Make small commits (1–3 files, one subtask each) that start with the subtask ID, e.g. `3.4.b: diagnosis scoring`. Run `uv run poe check` first.
 - For a real design decision, add a 5–10 line note in `docs/decisions/NNNN-title.md` covering context, decision, why and alternatives.
 - If a test is flaky, fix the cause. Never add sleeps or blind retries.
 - When stage output fails validation, retry once with the validation error included, then fail the stage and route the request to an engineer.

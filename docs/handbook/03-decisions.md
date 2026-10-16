@@ -160,6 +160,13 @@ We still build plain RAG as a **baseline** and measure both, so "ours is better"
 
 **Why:** a clean, auditable timeline for every request, and no impossible states.
 
+**Update (task 1.2, decided together):**
+- **Two locks, not one.** Reviewing the design turned up a gap: a logged-in user could have switched on the "change in progress" flag themselves. Now people simply don't have permission to change a status directly, and the database's own check still catches mistakes in our server code.
+- **People are identified from their login,** not from a name passed in, so nobody can pretend to be an engineer. The background worker must say it's the worker.
+- **Who may do what:** the spec's table, plus: admins can do what engineers and sales can; only the engineer who claimed a request (or an admin) can release it; only a technician of that plant can send the missing answers.
+- **Another supplier's request looks "not found",** so nobody can probe which requests exist.
+- **Every request's history starts with "created by X",** written by the database itself.
+
 ---
 
 ## 0014: Website detail pages use `?id=` links

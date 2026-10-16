@@ -25,13 +25,14 @@ Goal: someone who opens this repo on the other machine, with no access to this c
    - If new client documents or private photos were added on this machine, run `uv run poe raw-push` so the other machine can pull them.
 
 5. **Commit** the task's files and `docs/PROGRESS.md`, but only after the owner has reviewed the uncommitted diff in VS Code and said "commit" (CLAUDE.md "Review before committing"). If they haven't yet, update `docs/PROGRESS.md`, list the changed files in reading order, and stop here.
-   - If you wrote a decision note this session, its plain-language entry in `docs/handbook/03-decisions.md` must be in the same commit.
+   - Commit **one subtask at a time, 1–3 files each**, titled `<plan-id>.<letter>: <summary>` (CLAUDE.md "Tracking work"). Split further rather than exceed 3 files.
+   - If you wrote a decision note this session, its plain-language entry in `docs/handbook/03-decisions.md` must be in the same PR.
    - If the task's "Done when" check passes, use the message `<plan-id>: <summary>`.
    - Otherwise use `<plan-id>: WIP - <what's left>`.
    - Never use `--no-verify`.
 
 6. **Push** with `git push -u origin <branch>`. Never force-push. If the push fails (network or auth), say so plainly: the handoff isn't finished until the branch is on GitHub.
-   - If the task's "Done when" passes and no PR exists yet, open one into `dev` from `.github/pull_request_template.md`, with `Closes #<story>` and a complete **Reading guide**. Leave the owner's sign-off box unticked.
+   - If the task's "Done when" passes and no PR exists yet, open one into `dev` from `.github/pull_request_template.md`, with `Closes #<story>`, `Closes #<subtask>` for each subtask, and a complete **Reading guide** organized by subtask. Leave the owner's sign-off box unticked.
    - Move the story on the board: *In review* when a PR is open, otherwise *In progress*.
 
 7. **Report** in at most six lines:

@@ -69,6 +69,19 @@ Every knowledge row is `draft`, `approved` or `retired`, and **the live system r
 | `knowledge_proposals` | Suggested corrections, with status and eval report | How the system learns without the chat changing anything directly |
 | `events` | Append-only log: "created", "status changed", "analysis ready"… | The audit trail, and the trigger for emails and follow-ups |
 
+## How a request's status changes
+
+Only through one database function, `transition_request()`, the gatekeeper:
+1. It works out **who's asking** from their login (or the worker naming itself).
+2. It **locks the request**, so two engineers claiming at once take turns, and only the first succeeds.
+3. It checks the **move is in the spec's table** (no `submitted → quote_sent`).
+4. It checks **this caller may make it** (only sales or admins send quotes; only the claimer or an admin releases).
+5. It checks **preconditions** (a quote needs an approved or edited review).
+6. It **makes the change**: a new attempt when analysis restarts; a claim records the engineer.
+7. It **logs an event**: from, to, who, why.
+
+Nothing else can change a status. People lack permission to do it directly, and the database refuses any direct change from server code too. A new request must start as `submitted`, and its creation is logged automatically.
+
 ## The thinking behind it
 
 1. **The database refuses bad data itself.** Links are checked, statuses only accept listed values, confidence stays between 0 and 1. No bug or script can break these rules.

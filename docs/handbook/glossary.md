@@ -35,4 +35,5 @@
 | **Static site** | A website made of plain files, with no server program running; free to host. |
 | **Tenant** | A supplier company using the system. Each tenant's data is isolated. |
 | **Vector database** | A database that stores embeddings and finds similar ones; we use Postgres with pgvector. |
+| **Trigger (database)** | A small function the database runs automatically when rows change, e.g. to refuse an illegal status change or to log a new request. |
 | **WSL2** | Windows Subsystem for Linux: a real Linux system running inside Windows. |
