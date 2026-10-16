@@ -476,6 +476,8 @@ source: own_photo | client_case | synthetic_ui_only
 ## 15. Security and privacy
 
 - RLS on every table, keyed on `tenant_id` and the roles and plants from `profiles`. The API runs under RLS (`SET LOCAL ROLE authenticated`); only the worker and MCP use the service role, always with an explicit tenant filter.
+- **Who reads what, and rights** (decision 0023): staff see their supplier; plant users see their plants' requests and records, approved knowledge, themselves and the staff on their requests; analyses, reviews, cases, chat and proposals are staff-only. `anon` has no rights; `authenticated` is read-only until each API task adds its writes; new objects start closed.
+- **The Data API is off** (PostgREST and GraphQL): browsers only sign in and receive live updates; everything else goes through our API.
 - The ticket chat's guardrails are in §12.
 - Photos are private in R2. Access goes through short-lived signed URLs.
 - Client documents and photos go only to paid model endpoints that don't train on the data. No free-tier APIs with real data.
