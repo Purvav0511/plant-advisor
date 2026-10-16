@@ -193,15 +193,17 @@ analyzing → failed  (after DLQ; an engineer can push it to ready_for_review ma
 |---|---|---|
 | submitted | analyzing | worker |
 | analyzing | needs_info | worker |
-| needs_info | analyzing | api (answers received) |
+| needs_info | analyzing | plant user with access to that plant (answers received) |
 | analyzing | ready_for_review | worker |
 | analyzing | failed | worker |
 | failed | ready_for_review | engineer |
 | ready_for_review | in_review | engineer (claim) |
-| in_review | ready_for_review | engineer (release) |
+| in_review | ready_for_review | the claiming engineer, or an admin (release) |
 | in_review | quote_sent | sales (needs an approved or edited review) |
 | in_review | closed | engineer or sales |
 | quote_sent | closed | sales or system |
+
+Admins may make any move engineers and sales may. Callers are identified by their login token; server code names itself `worker` or `system` (decision 0013 update).
 
 The `in_review → ready_for_review` release is the only backward-looking move. It returns a claimed request to the queue, and it's allowed explicitly.
 
