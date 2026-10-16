@@ -169,6 +169,7 @@ Before PLAN task 0.2 exists, only the clone and `.env` steps apply. Then start C
 **The shared dev database:**
 - `DATABASE_URL` must be the **Session pooler** string from Supabase. The direct host is IPv6-only, and WSL2 and many home networks can't reach it.
 - `uv run poe migrate` applies migrations to the shared dev project. Always pull first.
+- **Turn off the Data API** on every hosted project (dev now, prod later): in the Supabase dashboard, open the **Data API** integration overview and switch **Enable Data API** off. Browsers then only sign in and get live updates; every read and write goes through our API (decision 0023). `uv run poe doctor` warns while it's still on.
 - Never edit a migration that's already been applied. Add a new one instead. `poe doctor` flags drift between the repo and the database.
 - `uv run poe test-int` uses a **local** Supabase in Docker that it resets each run, so tests never touch the shared data.
 - Free-tier dev projects pause after 7 days without activity. If yours does, resume it in the Supabase dashboard.
