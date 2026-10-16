@@ -198,11 +198,13 @@ venv = ".venv"
 include = ["packages", "services", "ingestion", "evals", "scripts"]
 exclude = ["**/node_modules", "**/__pycache__", "apps", "evals/recordings"]
 typeCheckingMode = "standard"
+extraPaths = ["packages/core/tests/integration"]
 strict = ["packages/core/src"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib", "--strict-markers", "-q"]
-pythonpath = ["."]
+# "." for `scripts`; the integration folder for its shared `dbtools` helpers.
+pythonpath = [".", "packages/core/tests/integration"]
 testpaths = ["packages", "services", "ingestion", "evals", "scripts/tests"]
 markers = [
     "integration: needs local Supabase (uv run poe test-int)",
