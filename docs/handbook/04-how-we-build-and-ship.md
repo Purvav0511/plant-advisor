@@ -82,7 +82,7 @@ Dependabot opens update PRs into `dev`, grouped by type (Python, Node, GitHub Ac
 2. Start a session with `/pickup`; Claude syncs and checks the machine.
 3. Branch: `git switch -c task/<id>-<slug>` from `dev`.
 4. Build it: tests first for core logic, then code until `uv run poe check` is green.
-5. Claude stops with the changes **uncommitted**. Review them in VS Code (*Source Control*, Ctrl+Shift+G), ask and challenge, then say "commit".
+5. Claude stops with the changes **uncommitted**. Review them in VS Code (*Source Control*, Ctrl+Shift+G), ask and challenge, then say "commit". Claude then commits **one subtask at a time, 1–3 files each**, so the PR's commit list reads as a step-by-step story.
 6. `/handoff` (or open the PR): checks, notes in `docs/PROGRESS.md`, push, PR into `dev`.
 7. CI runs. Re-read anything that changed after your review; `/walkthrough <pr>` helps.
 8. Tick **I read every changed file** in the PR description.

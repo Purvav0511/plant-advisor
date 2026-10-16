@@ -10,6 +10,7 @@ We track work on a free **GitHub Project** linked to the repo, which works like 
 |---|---|---|
 | **Epic** | An issue labelled `epic`, one per PLAN phase | *Epic: Phase 1: Data model and knowledge* |
 | **Story** | An issue labelled `story`, one per PLAN task, attached to its epic as a sub-issue | *1.6 Rule evaluator* |
+| **Subtask** | An issue labelled `subtask`, attached to its story as a sub-issue: one small step of 1–3 files, usually one commit | *1.2.c transition_request() migration and its tests* |
 | **Sprint / cycle** | The project's **Cycle** field: two-week iterations | *Cycle 1 (Oct 13 – Oct 26)* |
 | **Blocker** | Label `blocked-client` (waiting on the client) or `needs-human` (needs you) | *Client data: missing composition values* |
 
@@ -28,6 +29,7 @@ Other labels: `tests-first` (write tests before code), `phase-0` … `phase-7`.
 ## The routine
 
 - **Start of a cycle (every two weeks):** pick the next stories in PLAN order, set their Cycle, move them to *Ready*. Check `blocked-client` and `needs-human` items first, since they take the longest.
+- **Before building a story:** it's split into subtasks you can follow one by one (`/pickup` proposes the split). The story's progress bar fills as subtasks close.
 - **Each session:** `/pickup` moves the story to *In progress*; `/handoff` moves it to *In review* when the PR is open.
 - **After merging:** the PR's `Closes #N` closes the story; the epic's progress bar updates.
 - **New work that isn't in PLAN** (a bug, an idea): open an issue, label it, attach it to the right epic, and leave it in *Backlog* until it's planned.
