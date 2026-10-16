@@ -27,6 +27,7 @@ disable-model-invocation: true
 
 5. **Read the context.**
    - The story for the current PLAN task on the board (`gh issue list --label story --state open`), and move it to *In progress* when work starts.
+   - Its subtasks (`gh api repos/{owner}/{repo}/issues/<story>/sub_issues`). If it has none yet, propose a split into subtasks of 1–3 files each and create them once the owner agrees (CLAUDE.md "Tracking work").
    - The **Current state** block and the newest **Log** entry in `docs/PROGRESS.md`.
    - The current task in `docs/PLAN.md`, and the SPEC sections that task needs.
 
