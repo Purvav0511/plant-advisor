@@ -82,6 +82,24 @@ Only through one database function, `transition_request()`, the gatekeeper:
 
 Nothing else can change a status. People lack permission to do it directly, and the database refuses any direct change from server code too. A new request must start as `submitted`, and its creation is logged automatically.
 
+## Who sees what
+
+Nobody ever sees another supplier's rows. Within a supplier:
+
+| Data | Staff (engineer, sales, admin) | Technician (plant user) |
+|---|---|---|
+| Supplier, customers, plants | All | Their plants and the customer owning them |
+| People | Everyone at the supplier | Themselves, and the staff on their requests (contact, claimer, message authors) |
+| Invites | Admins only | — |
+| Components, installations | All | Those at their plants |
+| Products, playbooks, vocabulary | All, including drafts | **Approved only** |
+| Rules, ingestion issues | All | — |
+| Requests, photos, messages, quotes, outcomes | All | Every request at their plants (shared history) |
+| Timeline (events) | All | Creation and status changes of their plants' requests |
+| AI analyses, reviews, pipeline steps, case memory, AI chat, proposals | All | — (a filtered view comes through the app) |
+
+For now, signed-in people can only **read**; each API feature adds exactly the changes it needs. Browsers can't reach the tables directly at all: everything goes through our API ([decision 0023](03-decisions.md#0023-who-can-see-and-change-what)).
+
 ## The thinking behind it
 
 1. **The database refuses bad data itself.** Links are checked, statuses only accept listed values, confidence stays between 0 and 1. No bug or script can break these rules.
