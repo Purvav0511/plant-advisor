@@ -66,3 +66,19 @@ def test_migration_drift_both_directions():
 def test_major_version():
     assert major_version("v22.23.3") == 22
     assert major_version("garbage") is None
+
+
+def test_data_api_answers_detects_a_working_table_endpoint():
+    from scripts.doctor import data_api_answers
+
+    # On: a table answered (even empty), or PostgREST itself refused permission.
+    assert data_api_answers(200, b"[]")
+    assert data_api_answers(401, b'{"code":"42501","message":"permission denied for table"}')
+    assert data_api_answers(404, b'{"code":"PGRST205","message":"Could not find the table"}')
+    # Off: nothing serves tables. PGRST002 is what a hosted project with "Enable Data API"
+    # switched off answers (observed 2026-10-15): PostgREST can't load any schema.
+    off = b'{"code":"PGRST002","message":"Could not query the database for the schema cache."}'
+    assert not data_api_answers(503, off)
+    assert not data_api_answers(503, b"")
+    assert not data_api_answers(404, b"Not Found")
+    assert not data_api_answers(404, b'{"message":"no Route matched with those values"}')
