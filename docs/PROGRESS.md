@@ -8,15 +8,26 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/1.1-core-schema` (changes **uncommitted**, waiting for the owner's review in VS Code)
-- **PLAN task:** 1.1 Core schema migration (story #12). Code and checks done: 27 integration tests pass from a fresh database.
+- **Branch:** `task/1.2-transition-request` (reviewed by the owner; committed as subtasks 1.2.a–f, PR into `dev`)
+- **PLAN task:** 1.2 `transition_request()` and the events table (story #13). Code and checks done: 91 integration tests, 66 unit tests; the concurrent-claims test passed 10 of 10 runs.
+- **Shared dev DB:** 1.1 schema applied (25 tables, RLS on, both queues; doctor: no drift). 1.2 is applied after merging, from `dev`.
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.6, 1.1).
-- **Next step:** owner reviews the uncommitted diff and says "commit"; then PR into `dev`; after merging, apply the migration to the shared dev DB from `dev` (`uv run poe migrate`); then PLAN 1.2 (`transition_request()`).
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.6, 1.2).
+- **Practice (from 1.2):** every story is split into subtasks (sub-issues, label `subtask`); commits are one subtask each, 1–3 files.
+- **Next step:** owner merges the PR; after merging, `uv run poe migrate` from `dev`; then PLAN 1.3 (RLS policies; see the TRUNCATE note on story #14).
 - **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73); the 11 data sheets for `data/raw/wear_protection/` (needed by 1.7).
 - **On the other machine (Mac):** not set up yet (PLAN 0.6).
 
 ## Log
+
+### 2026-10-15 · pc-wsl · 1.2
+- **Changed:** migration `transition_request`: the gatekeeper function (identity from the login token; SPEC §6 moves; per-move permissions incl. admins; release by claimer or admin; answers only by that plant's users; quote needs an approved or edited review; attempt +1 on entering analyzing; claim and release set and clear `claimed_by`; one `status_changed` event per move), lock 1 (column grants: signed-in roles can't update `status`, `attempt`, `claimed_by`), lock 2 (trigger), new requests must start clean, `request_created` event on insert.
+- **Changed:** `packages/core/tests/integration/`: `dbtools.py` (plain helpers) and `conftest.py` (fixtures) shared by both test files; `test_transitions.py` (64 tests incl. every allowed move, wrong callers, foreign tenant sees "not found", both locks, concurrent claims).
+- **Decisions (with the owner):** 0013 update: two locks, identity from login, release by claimer or admin, answers by plant users only, creation logged.
+- **Found:** Supabase grants TRUNCATE to `anon`/`authenticated` by default; noted on story #14 for 1.3.
+- **Practice:** subtasks per story and 1–3 files per commit (CLAUDE.md "Tracking work"); 1.2 split into #82–#87.
+- **Next:** owner merges; after merge, `uv run poe migrate` from `dev`.
+- **On the other machine:** nothing beyond `git pull`.
 
 ### 2026-10-14 · pc-wsl · 1.1
 - **Changed:** migration `20261014225057_core_schema.sql`: the 25 tables of SPEC §5, composite tenant foreign keys, checks on every status-like column, `updated_at` triggers, the SPEC indexes plus per-request lookups, HNSW cosine indexes on all 5 embedding columns, RLS enabled everywhere (no policies until 1.3), and the `requests` / `requests_dlq` queues.
