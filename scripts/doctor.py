@@ -12,6 +12,8 @@ import os
 import platform
 import re
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -92,6 +94,20 @@ def location_problems(path: PurePath, *, is_wsl: bool) -> list[str]:
 def migration_drift(local: list[str], applied: list[str]) -> tuple[list[str], list[str]]:
     """Return (local migrations not applied, applied migrations unknown to this checkout)."""
     return sorted(set(local) - set(applied)), sorted(set(applied) - set(local))
+
+
+# Answers that prove the Data API is serving tables: permission refused on a table (42501),
+# or "no such table" (PGRST205). With "Enable Data API" off, a hosted project answers 503
+# PGRST002 ("could not query the database for the schema cache") instead.
+SERVING_CODES = (b'"code":"42501"', b'"code":"PGRST205"')
+
+
+def data_api_answers(status: int, body: bytes) -> bool:
+    """Whether a table request over Supabase's Data API was served: a table answered (even
+    empty), or PostgREST looked up the table and refused. Anything else means it's off."""
+    if status == 200:
+        return True
+    return any(code in body for code in SERVING_CODES)
 
 
 def major_version(text: str) -> int | None:
@@ -236,6 +252,28 @@ def check_git_hooks() -> Result:
     return Result(OK, "git hooks", "pre-commit and pre-push installed")
 
 
+def check_data_api() -> Result:
+    """The hosted project's Data API must be off (decision 0023): every read and write goes
+    through our API. Asks for a table with the publishable key; prints no keys or data."""
+    base, key = os.environ.get("SUPABASE_URL", ""), os.environ.get("SUPABASE_ANON_KEY", "")
+    if not base or not key:
+        return Result(WARN, "data api", "SUPABASE_URL or SUPABASE_ANON_KEY empty; skipped")
+    url = base.rstrip("/") + "/rest/v1/requests?select=id&limit=1"
+    request = urllib.request.Request(url, headers={"apikey": key})
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            status, body = response.status, response.read(512)
+    except urllib.error.HTTPError as exc:
+        status, body = exc.code, exc.read(512)
+    except OSError as exc:
+        return Result(WARN, "data api", f"couldn't reach the project ({type(exc).__name__})")
+    if data_api_answers(status, body):
+        return Result(
+            WARN, "data api", "still on: turn off 'Enable Data API' in the dashboard (DEV_SETUP §5)"
+        )
+    return Result(OK, "data api", f"off (table endpoint answered {status})")
+
+
 def check_ml_stack() -> Result:
     """torch and torchvision must come from matching builds, or open_clip fails at import."""
     code = "import torch, torchvision, open_clip; print(torch.__version__, torchvision.__version__)"
@@ -261,6 +299,7 @@ def main() -> int:
         check_location(),
         check_git_hooks(),
         check_ml_stack(),
+        check_data_api(),
     ]
     width = max(len(r.name) for r in results)
     for r in results:

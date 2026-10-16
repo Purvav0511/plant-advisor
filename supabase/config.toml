@@ -5,7 +5,10 @@
 project_id = "plant-advisor"
 
 [api]
-enabled = true
+# The Data API (PostgREST and GraphQL over our tables) is off: browsers only sign in and get
+# live updates; every read and write goes through our API (decision 0023, PLAN 1.3.f). The
+# hosted projects turn it off in the dashboard (DEV_SETUP §5); `poe doctor` checks.
+enabled = false
 # Port to use for the API URL.
 port = 54321
 # Schemas to expose in your API. Tables, views and stored procedures in this schema will get API

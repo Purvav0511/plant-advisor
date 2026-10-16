@@ -286,3 +286,20 @@ Urgent **security** fixes skip the waiting period, so they still arrive quickly.
 | **Database enforces the rules (chosen)** | Bad data is impossible, whichever code writes it | A little more design up front |
 | Only the application code checks | Simpler schema | Every code path must remember every rule |
 | Allow deletes that cascade to related rows | Easy cleanup | One delete can silently erase history |
+
+---
+
+## 0023: Who can see and change what
+*Technical note: [0023](../decisions/0023-access-rules.md)*
+
+**Decision (made together in task 1.3):**
+- **One door.** Supabase normally lets browsers read and write tables directly. We switched that off: browsers only sign in and get live updates, and everything else goes through our API, which checks every request.
+- **Signed-out visitors can do nothing. Signed-in people can only read for now.** Each API feature adds exactly the changes it needs, when it's built and tested.
+- **Who sees what:** staff see everything at their own supplier. A technician sees their plants, every request at those plants (the shared history), approved products, themselves, and the staff working on their requests. The AI's raw analysis, reviews, the AI chat and knowledge proposals are staff-only: technicians see a filtered version through the app, which hides products when the analysis is weak.
+- **Nobody ever sees another supplier's data.**
+
+| Option | Pros | Cons |
+|---|---|---|
+| **One door, read-only to start, strict visibility (chosen)** | Least exposure; every change is validated in one place | The API must build every screen's data |
+| Let browsers use Supabase's table API | Faster frontend work | A second path that skips our checks |
+| Show technicians all staff | Simpler rule | Exposes the whole staff list |

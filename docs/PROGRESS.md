@@ -8,17 +8,26 @@ This file is the shared memory between your machines and between sessions. Claud
 
 ## Current state
 
-- **Branch:** `task/1.2-transition-request` (reviewed by the owner; committed as subtasks 1.2.a–f, PR into `dev`)
-- **PLAN task:** 1.2 `transition_request()` and the events table (story #13). Code and checks done: 91 integration tests, 66 unit tests; the concurrent-claims test passed 10 of 10 runs.
-- **Shared dev DB:** 1.1 schema applied (25 tables, RLS on, both queues; doctor: no drift). 1.2 is applied after merging, from `dev`.
+- **Branch:** `task/1.3-rls-policies` (changes **uncommitted**, waiting for the owner's review in VS Code)
+- **PLAN task:** 1.3 RLS policies (story #14), split into subtasks 1.3.a–h (#89–#96). Code and checks done: 262 integration tests, 67 unit tests.
+- **Shared dev DB:** 1.1 and 1.2 applied. 1.3 is applied after merging, from `dev`. The hosted Data API is **off** (owner, 2026-10-15); `poe doctor` confirms (a project with it off answers 503 PGRST002).
 - **Branch model:** `dev` = integration and default branch; `main` = production (decision 0019). Branch from `dev`.
-- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.6, 1.2).
-- **Practice (from 1.2):** every story is split into subtasks (sub-issues, label `subtask`); commits are one subtask each, 1–3 files.
-- **Next step:** owner merges the PR; after merging, `uv run poe migrate` from `dev`; then PLAN 1.3 (RLS policies; see the TRUNCATE note on story #14).
+- **Practice:** every story is split into subtasks (sub-issues, label `subtask`); commits are one subtask each, 1–3 files.
+- **Board:** https://github.com/users/Purvav0511/projects/3 (Cycle 1 left: 0.1, 0.6, 1.3).
+- **Next step:** owner's review and "commit"; PR; after merging, `uv run poe migrate` from `dev`; then PLAN 1.4 (seed data).
 - **Blockers / waiting on (from the client):** wear scale, composition values, carbon range, product description (issues #70–#73); the 11 data sheets for `data/raw/wear_protection/` (needed by 1.7).
 - **On the other machine (Mac):** not set up yet (PLAN 0.6).
 
 ## Log
+
+### 2026-10-15 · pc-wsl · 1.3
+- **Changed:** migrations `lockdown_privileges` (anon nothing; authenticated read-only; service_role no TRUNCATE/REFERENCES/TRIGGER/MAINTAIN; future objects start closed), `rls_helpers` (`private` schema: my_tenant, my_roles, my_plants, is_staff, is_admin), `rls_people`, `rls_knowledge`, `rls_requests` (read policies for all 25 tables).
+- **Changed:** tests: `test_privileges`, `test_rls_helpers`, `test_rls_people`, `test_rls_knowledge`, `test_rls_requests` (incl. "every table has a read policy"); the two-supplier fixture in `conftest.py`.
+- **Changed:** local Data API off (`supabase/config.toml`); `poe doctor` checks the hosted one; DEV_SETUP §5 step.
+- **Decisions (with the owner):** [0023](decisions/0023-access-rules.md): one door (Data API off), read-only until each API task, plant users see only the staff on their requests, analyses etc. staff-only.
+- **Found:** 1.2's column grant on `requests` for signed-in users is removed by the lockdown (read-only); 4.x grants back what each endpoint needs. Postgres 17's MAINTAIN right (allows LOCK TABLE) was also granted by default; revoked.
+- **Next:** owner's review; after merge, `uv run poe migrate` from `dev`. (Hosted Data API already off.)
+- **On the other machine:** `git pull`; restart local Supabase (`poe db-down`, `poe db-up`) so the Data API is off locally too.
 
 ### 2026-10-15 · pc-wsl · 1.2
 - **Changed:** migration `transition_request`: the gatekeeper function (identity from the login token; SPEC §6 moves; per-move permissions incl. admins; release by claimer or admin; answers only by that plant's users; quote needs an approved or edited review; attempt +1 on entering analyzing; claim and release set and clear `claimed_by`; one `status_changed` event per move), lock 1 (column grants: signed-in roles can't update `status`, `attempt`, `claimed_by`), lock 2 (trigger), new requests must start clean, `request_created` event on insert.
